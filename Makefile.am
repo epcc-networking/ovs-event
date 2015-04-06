@@ -192,7 +192,7 @@ CLEAN_LOCAL += clean-pycov
 # Makefile in datapath/linux, needed to get the list of files to
 # distribute, requires GNU make extensions.
 if GNU_MAKE
-ALL_LOCAL += dist-hook-git
+#ALL_LOCAL += dist-hook-git
 dist-hook-git: distfiles
 	@if test -e $(srcdir)/.git && (git --version) >/dev/null 2>&1; then \
 	  (cd datapath && $(MAKE) distfiles);				    \
