@@ -6742,10 +6742,11 @@ void event_report
 }
 */
 
-bool 
+struct ofputil_event_port_timer_report* 
 event_port_timer_check( struct ofproto* ofproto, struct event_port_timer* port_timer )
 {
     bool happened = false;
+    struct ofputil_event_port_timer_report* report = NULL;
     struct netdev_stats port_stats;
     struct ofport *ofport = ofproto_get_port(ofproto, port_timer->check_port);
 
@@ -6755,6 +6756,9 @@ event_port_timer_check( struct ofproto* ofproto, struct event_port_timer* port_t
 
         if( port_stats.tx_packets >=
          port_timer -> prev_tx_packets + port_timer -> threshold_tx_packets){
+
+            VLOG_INFO("Triggered by TX packets, %"PRIu64" packets "
+                , port_stats.tx_packets - port_timer->prev_tx_packets);
             happened = true;
         }
     }
@@ -6762,6 +6766,9 @@ event_port_timer_check( struct ofproto* ofproto, struct event_port_timer* port_t
     if( (port_timer -> event_conditions & EVT_CONDITION_TX_BYTES) != 0 ){
         if(port_stats.tx_bytes >= 
             port_timer->prev_tx_bytes + port_timer->threshold_tx_bytes){
+
+            VLOG_INFO("Triggered by TX bytes, %"PRIu64" bytes "
+                , port_stats.tx_bytes - port_timer->prev_tx_bytes);
             happened = true;
         }
     }
@@ -6769,6 +6776,9 @@ event_port_timer_check( struct ofproto* ofproto, struct event_port_timer* port_t
     if( (port_timer -> event_conditions & EVT_CONDITION_RX_PACKETS) != 0  ){
         if(port_stats.rx_packets >=
             port_timer->prev_rx_packets + port_timer->threshold_rx_packets){
+
+            VLOG_INFO("Triggered by RX packets, %"PRIu64" packets "
+                , port_stats.rx_packets - port_timer->prev_rx_packets);
             happened = true;
         }
     }
@@ -6776,8 +6786,31 @@ event_port_timer_check( struct ofproto* ofproto, struct event_port_timer* port_t
     if( (port_timer -> event_conditions & EVT_CONDITION_RX_BYTES) != 0 ){
         if(port_stats.rx_bytes >= 
             port_timer->prev_rx_bytes + port_timer ->prev_rx_bytes){
+
+            VLOG_INFO("Triggered by RX bytes, %"PRIu64" bytes "
+                , port_stats.rx_bytes - port_timer->prev_rx_bytes);
             happened = true;
         }
+    }
+
+
+    if( happened ){
+        
+        report = xmalloc(sizeof *report);
+        report -> port_no = port_timer -> check_port;
+        report -> interval_sec = port_timer -> interval_sec;
+        report -> interval_msec = port_timer -> interval_msec;
+
+        report -> new_tx_packets = port_stats.tx_packets - port_timer -> prev_tx_packets;
+        report -> new_tx_bytes   = port_stats.tx_bytes   - port_timer -> prev_tx_bytes;
+        report -> new_rx_packets = port_stats.rx_packets - port_timer -> prev_rx_packets;
+        report -> new_rx_bytes   = port_stats.rx_bytes   - port_timer -> prev_rx_bytes;
+
+        report -> total_tx_packets = port_stats.tx_packets;
+        report -> total_tx_bytes   = port_stats.tx_bytes;
+        report -> total_rx_packets = port_stats.rx_packets;
+        report -> total_rx_bytes   = port_stats.rx_bytes;
+
     }
 
     port_timer -> prev_tx_packets = port_stats.tx_packets;
@@ -6785,17 +6818,28 @@ event_port_timer_check( struct ofproto* ofproto, struct event_port_timer* port_t
     port_timer -> prev_rx_packets = port_stats.rx_packets;
     port_timer -> prev_rx_bytes   = port_stats.rx_bytes;
 
-    return happened;
+    return report;
+
 }
 
-bool 
+struct ofputil_event_flow_timer_report *  
 event_flow_timer_check(struct ofproto *ofproto, struct event_flow_timer *flow_timer)
 {
     struct rule_criteria criteria;
     struct rule_collection rules;
     size_t i;
+    struct event_single_flow *single_flow, *next_flow;
 
     bool happened = false;
+    struct ofputil_event_flow_timer_report *report;
+
+    report = xmalloc(sizeof *report);
+    list_init(&report->single_flows);
+    report->match = flow_timer->match;
+    report->interval_sec = flow_timer->interval_sec;
+    report->interval_msec = flow_timer->interval_msec;
+    report->table_id = flow_timer->table_id;
+    report->out_port = flow_timer->out_port;
 
     rule_criteria_init( &criteria, flow_timer->out_port, &(flow_timer->match), 0, 0, 0, flow_timer->out_port, OFPG_ANY);
     
@@ -6809,12 +6853,16 @@ event_flow_timer_check(struct ofproto *ofproto, struct event_flow_timer *flow_ti
     rule_collection_ref(&rules);
     ovs_mutex_unlock(&ofproto_mutex);
 
+    LIST_FOR_EACH(single_flow,list_node, &(flow_timer->single_flows)){
+        single_flow->exist = false;
+    }
+
+
 
     for(i = 0; i < rules.n; i++){
         struct rule* rule = rules.rules[i];
         uint64_t packet_count, byte_count;
         long long int used;
-        struct event_single_flow *single_flow;
         bool is_new_rule = true;
         bool happened_single = false;
 
@@ -6826,6 +6874,7 @@ event_flow_timer_check(struct ofproto *ofproto, struct event_flow_timer *flow_ti
         LIST_FOR_EACH(single_flow, list_node, &(flow_timer->single_flows) ){
             if(single_flow->rule == rule){/* same rule. */
                 is_new_rule = false;
+                single_flow->exist = true;
                 break;
             }
         }
@@ -6834,6 +6883,7 @@ event_flow_timer_check(struct ofproto *ofproto, struct event_flow_timer *flow_ti
             VLOG_INFO("New rule");
             single_flow = xmalloc(sizeof *single_flow);
             ofproto_rule_ref(rule);
+            single_flow -> exist = true;
             single_flow -> rule = rule;
             single_flow -> prev_match_packets = 0;
             single_flow -> prev_match_bytes   = 0;
@@ -6861,6 +6911,27 @@ event_flow_timer_check(struct ofproto *ofproto, struct event_flow_timer *flow_ti
         }
 
         if(happened_single){
+            struct ofputil_event_single_flow_report* flow_report;
+            const struct rule_actions *actions = rule_get_actions(rule);
+
+            flow_report = xmalloc(sizeof *flow_report);
+            list_insert( &report->single_flows, &flow_report->list_node);
+            flow_report->table_id = rule->table_id;
+
+            flow_report->ofpacts = actions->ofpacts;
+            flow_report->ofpacts_len = actions->ofpacts_len;
+
+            calc_duration(rule->created, time_msec(), &flow_report->duration_sec, &flow_report->duration_nsec);
+
+            minimatch_expand( &(rule->cr.match), &(flow_report->match));
+            flow_report->total_match_packets = packet_count;
+            flow_report->total_match_bytes   = byte_count;
+
+            flow_report->new_match_packets 
+            = packet_count + single_flow->additional_match_packets - single_flow->prev_match_packets;
+
+            flow_report->new_match_bytes 
+            = byte_count + single_flow->additional_match_bytes - single_flow->prev_match_bytes;
             VLOG_INFO("Happened on single flow %u",i);
         }
 
@@ -6871,7 +6942,24 @@ event_flow_timer_check(struct ofproto *ofproto, struct event_flow_timer *flow_ti
 
     }
 
-    return happened;
+    rule_collection_unref(&rules);
+
+    LIST_FOR_EACH_SAFE(single_flow,next_flow,list_node,&(flow_timer->single_flows)){
+        if(single_flow->exist == false){
+            list_remove(&(single_flow->list_node));
+            /*ofproto_rule_unref(single_flow->rule);*/
+            free(single_flow);
+            VLOG_INFO("remove a flow");
+        }
+    }
+
+    if(happened){
+        return report;
+    }
+    else{
+        free(report);
+        return NULL;
+    }
 }
 
 
@@ -6889,17 +6977,25 @@ ofproto_event_run(struct ofproto *ofproto){
             struct event_port_timer* port_timer = event->port_timer;
 
             if(time_msec() >= port_timer->next_check_time){
-                bool happened = false;
+                struct ofputil_event_port_timer_report *report;
                 real_run = true;
 
                 VLOG_INFO("now = %lld, time to check event %u ", time_msec(),event->event_id);
                 VLOG_INFO("check port %u...",event->port_timer->check_port);
 
-                happened =  event_port_timer_check( ofproto, event->port_timer);
+                report =  event_port_timer_check( ofproto, event->port_timer);
 
-                if(happened){
+                if(report != NULL){
                     VLOG_INFO("Event %u: port stats happened", event->event_id);
+                    VLOG_INFO("New: TX packets = %"PRIu64", TX bytes = %"PRIu64", RX packets = %"PRIu64", RX bytes = %"PRIu64" ",
+                      report->new_tx_packets, report->new_tx_bytes, report->new_rx_packets,report->new_rx_bytes);
+                    VLOG_INFO("Total: TX packets = %"PRIu64", TX bytes = %"PRIu64", RX packets = %"PRIu64", RX bytes = %"PRIu64" ",
+                      report->total_tx_packets, report->total_tx_bytes, report->total_rx_packets,report->total_rx_bytes);
+
+
+                    free(report);
                 }
+
 
                 if(event->periodic) {
                     port_timer->next_check_time = time_msec() + port_timer->interval_sec*1000 + port_timer->interval_msec;
@@ -6914,13 +7010,31 @@ ofproto_event_run(struct ofproto *ofproto){
         else if(event->event_type == EVT_FLOW_STATS_TIMER_TRIGGER){
             struct event_flow_timer* flow_timer = event->flow_timer;
             bool happened = false;
-
+            struct ofputil_event_flow_timer_report *report;
             
             if(time_msec() >= flow_timer->next_check_time){
-                
+
                 VLOG_INFO("now = %lld, time to check event %u ", time_msec(),event->event_id);
                 real_run = true;
-                event_flow_timer_check(ofproto,flow_timer);
+                report = event_flow_timer_check(ofproto,flow_timer);
+
+                if(report != NULL){
+                    /* happened. */
+                    struct ofputil_event_single_flow_report *flow_report;
+                    VLOG_INFO("match = %s", match_to_string(&flow_timer->match,0) );
+                    LIST_FOR_EACH(flow_report,list_node, &report->single_flows){
+                        VLOG_INFO("single flow match = %s", match_to_string (&flow_report->match,0) );
+                        VLOG_INFO("duration = %u seconds + %u nanoseconds", flow_report->duration_sec, flow_report->duration_nsec);
+                        VLOG_INFO("New: matched packets = %"PRIu64", bytes = %"PRIu64" "
+                            , flow_report->new_match_packets,flow_report->new_match_bytes);
+                        VLOG_INFO("Total: matched packets = %"PRIu64", bytes = %"PRIu64" "
+                            , flow_report->total_match_packets,flow_report->total_match_bytes);
+
+
+                        free(report);
+
+                    }
+                }
 
                 if(event->periodic){
 

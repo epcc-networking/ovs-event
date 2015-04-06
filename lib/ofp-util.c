@@ -8924,7 +8924,6 @@ ofputil_decode_event_request(const struct ofp_header *oh,
     ofpbuf_use_const(&b, oh, length);
     raw = ofpraw_pull_assert(&b);
 
-    VLOG_INFO("Length = %"PRIu16" ",length);
     request = ofpbuf_pull(&b, sizeof *request);
     event_rh -> event_id = ntohl(request -> event_id);
     event_rh -> request_type = request -> request_type;

@@ -1172,12 +1172,49 @@ struct ofputil_event_reply_msg{
     uint32_t event_id; 
 };
 
-struct ofputil_event_report_msg{
-    uint16_t event_type;
-    uint16_t port_no;
+struct ofputil_event_port_timer_report{
+    ofp_port_t port_no;
     uint32_t interval_sec;
     uint32_t interval_msec;
-    uint64_t stat_number; 
+
+    uint64_t new_tx_packets;
+    uint64_t new_tx_bytes;
+    uint64_t new_rx_packets;
+    uint64_t new_rx_bytes;
+
+    uint64_t total_tx_packets;
+    uint64_t total_tx_bytes;
+    uint64_t total_rx_packets;
+    uint64_t total_rx_bytes;
+};
+
+struct ofputil_event_single_flow_report{
+
+    struct ovs_list list_node;
+    struct match match;
+    uint8_t table_id;
+
+    uint32_t duration_sec;
+    uint32_t duration_nsec;
+
+    uint64_t new_match_packets;
+    uint64_t new_match_bytes;
+
+    uint64_t total_match_packets;
+    uint64_t total_match_bytes;
+
+    size_t ofpacts_len;
+    const struct ofpact* ofpacts;
+};
+
+struct ofputil_event_flow_timer_report{
+    struct match match;
+    uint8_t table_id;
+    ofp_port_t out_port;
+
+    uint32_t interval_sec;
+    uint32_t interval_msec;
+    struct ovs_list single_flows;
 };
 
 enum ofperr ofputil_decode_event_request(const struct ofp_header *, 

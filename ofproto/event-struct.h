@@ -28,6 +28,7 @@ struct event_port_timer{
 };
 
 struct event_single_flow{
+    bool exist;
     struct rule *rule;
 
     uint64_t prev_match_packets;

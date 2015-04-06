@@ -122,7 +122,7 @@ struct evt_event_report_header{
     ovs_be32 event_id;
 };
 
-struct evt_event_port_timer_report{
+struct evt_event_single_port_report{
     ovs_be16 port_no;
     uint8_t pad[2];
     ovs_be32 interval_sec;
@@ -137,11 +137,12 @@ struct evt_event_port_timer_report{
     ovs_be64 total_rx_bytes;
 };
  
-struct evt_event_flow_timer_report{
+struct evt_event_single_flow_report{
 
     struct ofp10_match match;
     uint8_t table_id;
-    uint8_t pad[3];
+    uint16_t out_port;
+    uint8_t pad;
     
     ovs_be32 interval_sec;
     ovs_be32 interval_msec;
