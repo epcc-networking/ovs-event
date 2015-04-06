@@ -32,6 +32,8 @@
 #include "openvswitch/types.h"
 #include "type-props.h"
 
+#include "openflow/event-ext.h" /* Event related extentions. */
+
 struct ofpbuf;
 union ofp_action;
 struct ofpact_set_field;
@@ -1120,4 +1122,81 @@ struct ofpbuf *ofputil_encode_bundle_add(enum ofp_version ofp_version,
 
 enum ofperr ofputil_decode_bundle_add(const struct ofp_header *,
                                       struct ofputil_bundle_add_msg *);
+
+
+/*Event related structures encodeing/decoding functions.*/
+struct ofputil_event_request_header{
+    uint32_t event_id;
+    enum evt_event_request_type request_type;
+    enum evt_event_periodic periodic;
+    enum evt_event_type event_type;
+};
+
+struct ofputil_event_request_port_timer{
+    uint32_t event_id;
+    enum evt_event_request_type request_type;
+    enum evt_event_periodic periodic;
+    enum evt_event_type event_type;
+
+    ofp_port_t check_port;
+    uint16_t event_conditions;
+    uint32_t interval_sec;
+    uint32_t interval_msec;
+    uint64_t threshold_tx_packets;
+    uint64_t threshold_tx_bytes;
+    uint64_t threshold_rx_packets;
+    uint64_t threshold_rx_bytes;
+
+};
+
+struct ofputil_event_request_flow_timer{
+    uint32_t event_id;
+    enum evt_event_request_type request_type;
+    enum evt_event_periodic periodic;
+    enum evt_event_type event_type;
+
+    struct match match;
+    uint8_t table_id;
+    ofp_port_t out_port;
+    uint16_t event_conditions;
+
+    uint32_t interval_sec;
+    uint32_t interval_msec;
+    uint64_t threshold_match_packets;
+    uint64_t threshold_match_bytes;
+};
+
+
+struct ofputil_event_reply_msg{
+    enum evt_event_reply_status event_status;
+    uint32_t event_id; 
+};
+
+struct ofputil_event_report_msg{
+    uint16_t event_type;
+    uint16_t port_no;
+    uint32_t interval_sec;
+    uint32_t interval_msec;
+    uint64_t stat_number; 
+};
+
+enum ofperr ofputil_decode_event_request(const struct ofp_header *, 
+                                         struct ofputil_event_request_header *);
+
+enum ofperr ofputil_decode_event_request_flow_timer(const struct ofp_header *,
+                                                    struct ofputil_event_request_flow_timer *);
+
+enum ofperr ofputil_decode_event_request_port_timer(const struct ofp_header *,
+                                                    struct ofputil_event_request_port_timer *);
+
+/* struct ofpbuf * ofputil_encode_event_reply(const struct ofp_header *,
+                                           enum evt_event_reply_status); */
+
+/* struct ofpbuf* ofputil_encode_event_report(enum ofp_version,
+                                           const struct evt_event_report*); */
+
+
+/* End of event related stuffs. */
+
+
 #endif /* ofp-util.h */

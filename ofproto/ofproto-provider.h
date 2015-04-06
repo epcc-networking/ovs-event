@@ -56,6 +56,8 @@ struct bfd_cfg;
 struct meter;
 struct ofoperation;
 
+struct event; 
+
 extern struct ovs_mutex ofproto_mutex;
 
 /* An OpenFlow switch.
@@ -107,6 +109,9 @@ struct ofproto {
      * meter_id. */
     struct ofputil_meter_features meter_features;
     struct meter **meters; /* 'meter_features.max_meter' + 1 pointers. */
+
+    /*Event table.*/
+    struct ovs_list event_list;
 
     /* OpenFlow connections. */
     struct connmgr *connmgr;

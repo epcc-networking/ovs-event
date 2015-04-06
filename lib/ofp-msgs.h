@@ -419,6 +419,17 @@ enum ofpraw {
 
     /* NXT 1.0+ (23): void. */
     OFPRAW_NXT_FLOW_MONITOR_RESUMED,
+
+/* Event related messages. */
+
+    /* EPCC 1.0 (0): uint8_t[]. */
+    OFPRAW_EPCC_EVENT_REQUEST,
+
+    /* EPCC 1.0 (1): uint8_t[]. */
+    OFPRAW_EPCC_EVENT_REPLY,
+
+    /* EPCC 1.0 (2): uint8_t[]. */
+    OFPRAW_EPCC_EVENT_REPORT,
 };
 
 /* Decoding messages into OFPRAW_* values. */
@@ -625,6 +636,11 @@ enum ofptype {
     OFPTYPE_FLOW_MONITOR_CANCEL,        /* OFPRAW_NXT_FLOW_MONITOR_CANCEL. */
     OFPTYPE_FLOW_MONITOR_PAUSED,        /* OFPRAW_NXT_FLOW_MONITOR_PAUSED. */
     OFPTYPE_FLOW_MONITOR_RESUMED,       /* OFPRAW_NXT_FLOW_MONITOR_RESUMED. */
+
+    /* Event related extention. */
+    OFPTYPE_EPCC_EVENT_REQUEST,  /* OFPRAW_EPCC_EVENT_REQUEST. */                            
+    OFPTYPE_EPCC_EVENT_REPLY,    /* OFPRAW_EPCC_EVENT_REPLY. */
+    OFPTYPE_EPCC_EVENT_REPORT,   /* OFPRAW_EPCC_EVENT_REPORT. */
 };
 
 /* Decoding messages into OFPTYPE_* values. */

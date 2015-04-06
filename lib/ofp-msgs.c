@@ -26,6 +26,8 @@
 #include "ovs-thread.h"
 #include "openvswitch/vlog.h"
 
+#include "openflow/event-ext.h"
+
 VLOG_DEFINE_THIS_MODULE(ofp_msgs);
 
 #define OFPT_VENDOR 4
@@ -168,6 +170,15 @@ ofphdrs_decode(struct ofphdrs *hdrs,
             }
             nh = (const struct nicira_header *) oh;
             hdrs->subtype = ntohl(nh->subtype);
+        }else if(hdrs->vendor == EPCC_VENDOR_ID){
+            struct evt_header *eh;
+
+            if(length < sizeof *eh){
+                return OFPERR_OFPBRC_BAD_LEN;
+            }
+
+            eh = (const struct evt_header *)oh;
+            hdrs->subtype = ntohl(eh->subtype);
         } else {
             log_bad_vendor(hdrs->vendor);
             return OFPERR_OFPBRC_BAD_VENDOR;
@@ -677,7 +688,7 @@ ofpraw_put__(enum ofpraw raw, uint8_t version, ovs_be32 xid,
     if (hdrs->type == OFPT_VENDOR) {
         struct nicira_header *nh = buf->header;
 
-        ovs_assert(hdrs->vendor == NX_VENDOR_ID);
+        /* ovs_assert(hdrs->vendor == NX_VENDOR_ID);*/
         nh->vendor = htonl(hdrs->vendor);
         nh->subtype = htonl(hdrs->subtype);
     } else if (version == OFP10_VERSION

@@ -8908,3 +8908,92 @@ ofputil_encode_bundle_add(enum ofp_version ofp_version,
 
     return request;
 }
+
+
+/* Event related encoding and decoding functions. */
+
+enum ofperr
+ofputil_decode_event_request(const struct ofp_header *oh, 
+                             struct ofputil_event_request_header * event_rh)
+
+{
+    const struct evt_event_request_header *request;
+    struct ofpbuf b;
+    uint16_t length =  ntohs(oh->length);
+    enum ofpraw raw;
+    ofpbuf_use_const(&b, oh, length);
+    raw = ofpraw_pull_assert(&b);
+
+    VLOG_INFO("Length = %"PRIu16" ",length);
+    request = ofpbuf_pull(&b, sizeof *request);
+    event_rh -> event_id = ntohl(request -> event_id);
+    event_rh -> request_type = request -> request_type;
+    event_rh -> periodic = request -> periodic;
+    event_rh -> event_type = ntohs( request -> event_type); 
+    return 0;
+}
+
+enum ofperr
+ofputil_decode_event_request_port_timer(const struct ofp_header *oh,
+                            struct ofputil_event_request_port_timer *event_req)
+{
+    const struct evt_event_request_port_timer *request;
+    struct ofpbuf b;
+    uint16_t length =  ntohs(oh->length);
+    enum ofpraw raw; 
+
+    ofpbuf_use_const(&b, oh, length);
+    raw = ofpraw_pull_assert(&b);
+
+    request =  ofpbuf_pull(&b, sizeof *request);
+    event_req -> event_id = ntohl(request -> event_id);
+    event_req -> request_type = request -> request_type; 
+    event_req -> periodic = request -> periodic;
+    event_req -> event_type = ntohs( request -> event_type); 
+
+    event_req -> check_port = u16_to_ofp( ntohs(request->check_port) );
+    event_req -> event_conditions = ntohs(request->event_conditions);
+    event_req -> interval_sec = ntohl(request->interval_sec);
+    event_req -> interval_msec = ntohl(request->interval_msec);
+    event_req -> threshold_tx_packets = ntohll(request->threshold_tx_packets);
+    event_req -> threshold_tx_bytes = ntohll(request->threshold_tx_bytes);
+    event_req -> threshold_rx_packets = ntohll(request->threshold_rx_packets);
+    event_req -> threshold_rx_bytes = ntohll(request->threshold_rx_bytes);
+
+    return 0;
+}
+
+enum ofperr 
+ofputil_decode_event_request_flow_timer(const struct ofp_header *oh,
+                             struct ofputil_event_request_flow_timer *event_req)
+{
+    const struct evt_event_request_flow_timer *request;
+    struct ofpbuf b;
+    uint16_t length =  ntohs(oh->length);
+    enum ofpraw raw;
+
+    ofpbuf_use_const(&b,oh,length);
+    raw = ofpraw_pull_assert(&b);
+
+    request = ofpbuf_pull(&b, sizeof *request);
+
+    event_req -> event_id = ntohl(request -> event_id);
+    event_req -> request_type = request -> request_type; 
+    event_req -> periodic = request -> periodic;
+    event_req -> event_type = ntohs( request -> event_type);
+    VLOG_INFO( "OFP10_MATCH: %s", ofp10_match_to_string( &(request->match),2 ) );
+    ofputil_match_from_ofp10_match ( &(request->match), &(event_req->match) );
+    event_req -> table_id = request->table_id;
+    event_req -> out_port = u16_to_ofp( ntohs ( request-> out_port) );
+    event_req -> event_conditions = ntohs( request->event_conditions );
+
+    event_req -> interval_sec = ntohl(request->interval_sec);
+    event_req -> interval_msec = ntohl(request->interval_msec);
+    event_req -> threshold_match_packets = ntohll(request->threshold_match_packets);
+    event_req -> threshold_match_bytes   = ntohll(request->threshold_match_bytes);
+
+    return 0;
+
+}
+
+/* End of event related things. */
