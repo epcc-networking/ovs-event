@@ -8995,4 +8995,108 @@ ofputil_decode_event_request_flow_timer(const struct ofp_header *oh,
 
 }
 
+struct ofpbuf*
+ofputil_encode_event_reply(enum ofp_version version, 
+                           const struct ofputil_event_reply_msg *reply )
+{
+    struct ofpbuf *b;
+    struct evt_event_reply_msg *msg;
+
+    b = ofpraw_alloc(OFPRAW_EPCC_EVENT_REPLY,version,0);
+    msg = ofpbuf_put_zeros(b,sizeof *msg);
+
+    msg->event_status = htons(reply->event_status);
+    msg->event_type = htons(reply->event_status);
+    msg->event_id = htonl(reply->event_id);
+
+    return b; 
+}
+
+struct ofpbuf* 
+ofputil_encode_event_report_header(enum ofp_version version,
+                            const struct ofputil_event_report_header* rh )
+{
+    struct ofpbuf *b;
+    struct evt_event_report_header *erh;
+
+    b = ofpraw_alloc(OFPRAW_EPCC_EVENT_REPORT,version,0);
+    erh = ofpbuf_put_zeros(b, sizeof *erh);
+
+    erh -> report_reason = htons(rh->reason);
+    erh -> event_type = htons(rh->event_type);
+    erh -> event_id = htonl(rh->event_id);
+
+    return b;
+
+}
+
+struct ofpbuf*
+ofputil_encode_event_port_timer_report(enum ofp_version version, 
+                                    const struct ofputil_event_report_header* rh,
+                                    const struct ofputil_event_port_timer_report *report)
+{
+    struct ofpbuf *b = ofputil_encode_event_report_header(version,rh);
+    struct evt_event_single_port_report *port_report;
+
+    port_report = ofpbuf_put_zeros(b,sizeof *port_report);
+
+    port_report -> port_no = htons(report->port_no);
+
+    port_report -> interval_sec = htonl(report->interval_sec);
+    port_report -> interval_msec = htonl(report->interval_msec);
+
+    port_report -> new_tx_packets = htonll(report->new_tx_packets);
+    port_report -> new_tx_bytes = htonll(report->new_tx_bytes);
+    port_report -> new_rx_packets = htonll(report->new_rx_packets);
+    port_report -> new_rx_bytes = htonll(report->new_rx_bytes);
+
+    port_report -> total_tx_packets = htonll(report->total_tx_packets);
+    port_report -> total_tx_bytes = htonll(report->total_tx_bytes);
+    port_report -> total_rx_packets = htonll(report->total_rx_packets);
+    port_report -> total_rx_bytes  = htonll(report->total_tx_bytes);
+
+    return b;
+}
+
+struct ofpbuf* 
+ofputil_encode_event_flow_timer_report(enum ofp_version version,
+                                 const struct ofputil_event_report_header* rh,
+                                 const struct ofputil_event_flow_timer_report* report)
+{
+    struct ofpbuf *b = ofputil_encode_event_report_header(version,rh);
+    struct evt_event_flow_timer_report_header *efrh;
+    struct evt_event_single_flow_report *sfr;
+    struct ofputil_event_single_flow_report *single_flow; 
+
+    efrh = ofpbuf_put_zeros(b,sizeof *efrh);
+    ofputil_match_to_ofp10_match( &report->match, &efrh->match);
+    efrh->table_id = report->table_id;
+    efrh->out_port = htons(report->out_port);
+    efrh->interval_sec = htonl(report->interval_sec);
+    efrh->interval_msec = htonl(report->interval_msec);
+
+    LIST_FOR_EACH(single_flow,list_node,&(report->single_flows)){
+        sfr = ofpbuf_put_zeros(b,sizeof *sfr);
+
+        ofputil_match_to_ofp10_match( &single_flow->match, &sfr->match);
+        sfr->table_id = single_flow->table_id;
+
+        sfr->duration_sec = htonl(single_flow->duration_sec);
+        sfr->duration_nsec = htonl(single_flow->duration_nsec);
+
+        sfr->new_match_packets = htonll(single_flow->new_match_packets);
+        sfr->new_match_bytes = htonll(single_flow->new_match_bytes);
+        sfr->total_match_packets = htonll(single_flow->total_match_packets);
+        sfr->total_match_bytes = htonll(single_flow->total_match_bytes);
+
+        sfr->length = htons( sizeof *sfr  + single_flow->ofpacts_len );
+        VLOG_INFO("=====single flow length = %u, action length = %u", ( sizeof *sfr  + single_flow->ofpacts_len), single_flow->ofpacts_len);
+        ofpacts_put_openflow_actions(single_flow->ofpacts, single_flow->ofpacts_len, b, version);
+        VLOG_INFO("===single flow length = %u", sizeof *sfr  + single_flow->ofpacts_len);
+        
+    }
+
+    return b;
+
+}
 /* End of event related things. */

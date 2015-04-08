@@ -54,17 +54,19 @@ enum evt_flow_condition{
 
 struct evt_event_request_header{
 
-    ovs_be32 event_id;
+    
     uint8_t  request_type;
     uint8_t  periodic;
     ovs_be16 event_type;
+    ovs_be32 event_id;
 };
 
 struct evt_event_request_port_timer{
-    ovs_be32 event_id;
+    
     uint8_t  request_type;
     uint8_t  periodic;
     ovs_be16 event_type;
+    ovs_be32 event_id;
     ovs_be16 check_port;
     ovs_be16 event_conditions;
     ovs_be32 interval_sec;
@@ -76,10 +78,11 @@ struct evt_event_request_port_timer{
 };
 
 struct evt_event_request_flow_timer{
-    ovs_be32 event_id;
+    
     uint8_t  request_type;
     uint8_t  periodic;
     ovs_be16 event_type;
+    ovs_be32 event_id;
     struct ofp10_match match;
     uint8_t table_id;
     uint8_t pad;
@@ -108,7 +111,7 @@ enum evt_event_reply_status{
 
 struct evt_event_reply_msg{
     ovs_be16 event_status;
-    uint8_t pad[2];
+    ovs_be16 event_type;
     ovs_be32 event_id;
 };
 
@@ -118,7 +121,7 @@ enum evt_report_reason{
 
 struct evt_event_report_header{
     ovs_be16 report_reason;
-    uint8_t pad[2];
+    ovs_be16 event_type;
     ovs_be32 event_id;
 };
 
@@ -136,22 +139,29 @@ struct evt_event_single_port_report{
     ovs_be64 total_rx_packets;
     ovs_be64 total_rx_bytes;
 };
+
+struct evt_event_flow_timer_report_header{
+    struct ofp10_match match;
+    uint8_t table_id;
+    uint8_t pad;
+    ovs_be16 out_port;    
+
+    ovs_be32 interval_sec;
+    ovs_be32 interval_msec;
+};
  
 struct evt_event_single_flow_report{
 
-    struct ofp10_match match;
+    ovs_be16 length;
     uint8_t table_id;
-    uint16_t out_port;
     uint8_t pad;
-    
-    ovs_be32 interval_sec;
-    ovs_be32 interval_msec;
-
-    ovs_be64 new_match_packets;
-    ovs_be64 new_match_bytes;
+    struct ofp10_match match;
 
     ovs_be32 duration_sec;
     ovs_be32 duration_nsec;
+
+    ovs_be64 new_match_packets;
+    ovs_be64 new_match_bytes;
 
     ovs_be64 total_match_packets;
     ovs_be64 total_match_bytes;

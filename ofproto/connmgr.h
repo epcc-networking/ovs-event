@@ -28,6 +28,8 @@
 #include "openflow/nicira-ext.h"
 #include "openvswitch/types.h"
 
+//#include "openflow/event-ext.h"
+
 struct nlattr;
 struct ofconn;
 struct rule;
@@ -169,6 +171,9 @@ void connmgr_send_flow_removed(struct connmgr *,
                                const struct ofputil_flow_removed *);
 void connmgr_send_packet_in(struct connmgr *,
                             const struct ofproto_packet_in *);
+
+void connmgr_send_event_report(struct connmgr*,
+                               const struct ofputil_event_report_header*);
 void ofconn_send_role_status(struct ofconn *ofconn, uint32_t role,
                              uint8_t reason);
 

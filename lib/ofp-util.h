@@ -1169,10 +1169,24 @@ struct ofputil_event_request_flow_timer{
 
 struct ofputil_event_reply_msg{
     enum evt_event_reply_status event_status;
+    enum evt_event_type event_type;
     uint32_t event_id; 
 };
 
+struct ofputil_event_report_header{
+    enum evt_report_reason reason;
+    enum evt_event_type event_type;
+    uint32_t event_id;
+
+    union{
+        struct ofputil_event_port_timer_report *port_report;
+        struct ofputil_event_flow_timer_report *flow_report;
+    } report_body ;
+
+};
+
 struct ofputil_event_port_timer_report{
+    enum evt_event_type event_type;
     ofp_port_t port_no;
     uint32_t interval_sec;
     uint32_t interval_msec;
@@ -1208,6 +1222,7 @@ struct ofputil_event_single_flow_report{
 };
 
 struct ofputil_event_flow_timer_report{
+    enum evt_event_type event_type;
     struct match match;
     uint8_t table_id;
     ofp_port_t out_port;
@@ -1226,11 +1241,24 @@ enum ofperr ofputil_decode_event_request_flow_timer(const struct ofp_header *,
 enum ofperr ofputil_decode_event_request_port_timer(const struct ofp_header *,
                                                     struct ofputil_event_request_port_timer *);
 
-/* struct ofpbuf * ofputil_encode_event_reply(const struct ofp_header *,
-                                           enum evt_event_reply_status); */
+struct ofpbuf*
+ofputil_encode_event_reply(enum ofp_version version, 
+                           const struct ofputil_event_reply_msg * );
 
-/* struct ofpbuf* ofputil_encode_event_report(enum ofp_version,
-                                           const struct evt_event_report*); */
+struct ofpbuf*
+ofputil_encode_event_report_header(enum ofp_version,
+                                   const struct ofputil_event_report_header*); 
+
+struct ofpbuf*
+ofputil_encode_event_port_timer_report(enum ofp_version, 
+                                    const struct ofputil_event_report_header*,
+                                    const struct ofputil_event_port_timer_report *);
+
+
+struct ofpbuf*
+ofputil_encode_event_flow_timer_report(enum ofp_version,
+                                       const struct ofputil_event_report_header*,
+                                       const struct ofputil_event_flow_timer_report *);
 
 
 /* End of event related stuffs. */

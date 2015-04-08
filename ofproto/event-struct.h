@@ -37,7 +37,8 @@ struct event_single_flow{
     uint64_t additional_match_packets;
     uint64_t additional_match_bytes;
 
-    struct ovs_list list_node;
+    //struct ovs_list list_node;
+    struct hmap_node hmap_node;
 };
 
 struct event_flow_timer{
@@ -56,8 +57,8 @@ struct event_flow_timer{
     uint64_t threshold_match_packets;
     uint64_t threshold_match_bytes;
 
-    struct ovs_list single_flows;
-
+    //struct ovs_list single_flows;
+    struct hmap single_flows;
 };
 
 struct event{
