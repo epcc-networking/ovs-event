@@ -8980,7 +8980,6 @@ ofputil_decode_event_request_flow_timer(const struct ofp_header *oh,
     event_req -> request_type = request -> request_type; 
     event_req -> periodic = request -> periodic;
     event_req -> event_type = ntohs( request -> event_type);
-    VLOG_INFO( "OFP10_MATCH: %s", ofp10_match_to_string( &(request->match),2 ) );
     ofputil_match_from_ofp10_match ( &(request->match), &(event_req->match) );
     event_req -> table_id = request->table_id;
     event_req -> out_port = u16_to_ofp( ntohs ( request-> out_port) );
@@ -8996,13 +8995,13 @@ ofputil_decode_event_request_flow_timer(const struct ofp_header *oh,
 }
 
 struct ofpbuf*
-ofputil_encode_event_reply(enum ofp_version version, 
+ofputil_encode_event_reply(const struct ofp_header *oh, 
                            const struct ofputil_event_reply_msg *reply )
 {
     struct ofpbuf *b;
     struct evt_event_reply_msg *msg;
 
-    b = ofpraw_alloc(OFPRAW_EPCC_EVENT_REPLY,version,0);
+    b = ofpraw_alloc_reply(OFPRAW_EPCC_EVENT_REPLY,oh,0);
     msg = ofpbuf_put_zeros(b,sizeof *msg);
 
     msg->event_status = htons(reply->event_status);
@@ -9040,7 +9039,7 @@ ofputil_encode_event_port_timer_report(enum ofp_version version,
 
     port_report = ofpbuf_put_zeros(b,sizeof *port_report);
 
-    port_report -> port_no = htons(report->port_no);
+    port_report -> port_no = htons(ofp_to_u16 (report->port_no) );
 
     port_report -> interval_sec = htonl(report->interval_sec);
     port_report -> interval_msec = htonl(report->interval_msec);
@@ -9071,7 +9070,7 @@ ofputil_encode_event_flow_timer_report(enum ofp_version version,
     efrh = ofpbuf_put_zeros(b,sizeof *efrh);
     ofputil_match_to_ofp10_match( &report->match, &efrh->match);
     efrh->table_id = report->table_id;
-    efrh->out_port = htons(report->out_port);
+    efrh->out_port = htons( ofp_to_u16 ( report->out_port) );
     efrh->interval_sec = htonl(report->interval_sec);
     efrh->interval_msec = htonl(report->interval_msec);
 
@@ -9090,10 +9089,8 @@ ofputil_encode_event_flow_timer_report(enum ofp_version version,
         sfr->total_match_bytes = htonll(single_flow->total_match_bytes);
 
         sfr->length = htons( sizeof *sfr  + single_flow->ofpacts_len );
-        VLOG_INFO("=====single flow length = %u, action length = %u", ( sizeof *sfr  + single_flow->ofpacts_len), single_flow->ofpacts_len);
         ofpacts_put_openflow_actions(single_flow->ofpacts, single_flow->ofpacts_len, b, version);
-        VLOG_INFO("===single flow length = %u", sizeof *sfr  + single_flow->ofpacts_len);
-        
+
     }
 
     return b;

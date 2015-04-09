@@ -1242,7 +1242,7 @@ enum ofperr ofputil_decode_event_request_port_timer(const struct ofp_header *,
                                                     struct ofputil_event_request_port_timer *);
 
 struct ofpbuf*
-ofputil_encode_event_reply(enum ofp_version version, 
+ofputil_encode_event_reply(const struct ofp_header *, 
                            const struct ofputil_event_reply_msg * );
 
 struct ofpbuf*

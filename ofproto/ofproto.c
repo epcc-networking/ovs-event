@@ -6408,7 +6408,7 @@ static uint32_t alloc_event_id(void)
     static atomic_uint32_t next_eid = ATOMIC_VAR_INIT(1);
     uint32_t eid;
     atomic_add(&next_eid, 1, &eid);
-    if( eid > EVT_EVENT_MAX){
+    if( eid > EVT_EVENT_ID_MAX){
         next_eid = ATOMIC_VAR_INIT(1);
         atomic_add(&next_eid, 1, &eid);
     }
@@ -6531,6 +6531,7 @@ ofproto_event_delete_by_id(struct ofproto * ofproto, uint32_t event_id)
     }
 }
 
+
 static enum ofperr
 handle_event_add(struct ofconn *ofconn, const struct ofp_header *oh,
                  const struct ofputil_event_request_header* rh)
@@ -6539,6 +6540,8 @@ handle_event_add(struct ofconn *ofconn, const struct ofp_header *oh,
     struct ofproto *ofproto;
     long long int now;
     enum ofperr error;
+    struct ofputil_event_reply_msg reply;
+    struct ofpbuf *reply_buf;
     VLOG_INFO("Add event");
 
     ofproto = ofconn_get_ofproto(ofconn);
@@ -6567,7 +6570,7 @@ handle_event_add(struct ofconn *ofconn, const struct ofp_header *oh,
         error = ofputil_decode_event_request_port_timer(oh,&event_req);
 
 
-        VLOG_INFO("Event on port %u", event_req.check_port);
+        /*VLOG_INFO("Event on port %u", event_req.check_port);
         VLOG_INFO("interval = %u seconds + %u milliseconds "
             ,event_req.interval_sec,event_req.interval_msec);
         if( (event_req.event_conditions & EVT_CONDITION_TX_PACKETS) != 0 ){
@@ -6588,7 +6591,7 @@ handle_event_add(struct ofconn *ofconn, const struct ofp_header *oh,
         if( (event_req.event_conditions & EVT_CONDITION_RX_BYTES) != 0){
             VLOG_INFO("Triggered if RX bytes over %"PRIu64" "
                 ,event_req.threshold_rx_bytes);
-        }
+        }*/
 
         port_timer->check_port = event_req.check_port;
         port_timer->event_conditions = event_req.event_conditions;
@@ -6624,11 +6627,11 @@ handle_event_add(struct ofconn *ofconn, const struct ofp_header *oh,
         //list_init(&(flow_timer->single_flows) );
         hmap_init( &(flow_timer->single_flows) );
 
-        VLOG_INFO("Event ID = %"PRIu32", request type = %u, periodic = %u, event type = %u",
+        /*VLOG_INFO("Event ID = %"PRIu32", request type = %u, periodic = %u, event type = %u",
             event_req.event_id, event_req.request_type, event_req.periodic, event_req.event_type);
 
         VLOG_INFO("Event on flow: match = %s | table ID = %u, out port = %u"
-            , match_to_string( &event_req.match, OFP_DEFAULT_PRIORITY ), event_req.table_id, event_req.out_port );
+            , match_to_string( &event_req.match, OFP_DEFAULT_PRIORITY ), event_req.table_id, event_req.out_port );*/
 
         flow_timer -> event_conditions = event_req.event_conditions;
         flow_timer -> match = event_req.match;
@@ -6643,18 +6646,18 @@ handle_event_add(struct ofconn *ofconn, const struct ofp_header *oh,
 
         event_find_rules(ofconn_get_ofproto(ofconn), &event_req.match, flow_timer );
         event->flow_timer = flow_timer;
-        VLOG_INFO("==========All single flows added==============");
+        /*VLOG_INFO("==========All single flows added==============");
 
         VLOG_INFO("In table %u, output at port %u", event_req.table_id, event_req.out_port);
-        VLOG_INFO("interval = %u seconds + %u milliseconds ",event_req.interval_sec,event_req.interval_msec);
+        VLOG_INFO("interval = %u seconds + %u milliseconds ",event_req.interval_sec,event_req.interval_msec);*/
 
-        if( ( event_req.event_conditions & EVT_CONDITION_MATCH_PACKETS ) != 0 ){
+       /* if( ( event_req.event_conditions & EVT_CONDITION_MATCH_PACKETS ) != 0 ){
             VLOG_INFO("Triggered if matched packets over %"PRIu64" ",event_req.threshold_match_packets);
         }
         
         if( ( event_req.event_conditions & EVT_CONDITION_MATCH_BYTES ) != 0 ){
             VLOG_INFO("Triggered if matched bytes over %"PRIu64" ", event_req.threshold_match_bytes);
-        }
+        }*/
 
         now = time_msec();
         event -> time_created = now;
@@ -6665,10 +6668,15 @@ handle_event_add(struct ofconn *ofconn, const struct ofp_header *oh,
         VLOG_ERR("Unknown event type");
         error = OFPERR_OFPBRC_BAD_SUBTYPE;
     }
-    if(error == 0){
+    if(error == 0){ 
         event->event_id = alloc_event_id();
         list_insert( &(ofproto->event_list), &(event->event_list_node) );
         VLOG_INFO("Event added, ID = %u",event->event_id);
+        reply.event_status = EVT_STATUS_ADDED;
+        reply.event_type = event->event_type;
+        reply.event_id = event->event_id;
+        reply_buf = ofputil_encode_event_reply( oh, &reply );
+        ofconn_send_reply(ofconn,reply_buf);
         return 0;      
     }
 
@@ -6689,10 +6697,52 @@ handle_event_modify(struct ofconn *ofconn OVS_UNUSED, const struct ofp_header *o
 }
 
 static enum ofperr
-handle_event_delete(struct ofconn *ofconn OVS_UNUSED, const struct ofp_header *oh OVS_UNUSED,
-                 const struct ofputil_event_request_header* rh OVS_UNUSED)
+handle_event_delete(struct ofconn *ofconn , const struct ofp_header *oh ,
+                 const struct ofputil_event_request_header* rh)
 {
     VLOG_INFO("event delete");
+    struct ofproto *ofproto = ofconn_get_ofproto(ofconn);
+    struct event *event, *next_event;
+    bool event_id_exist = false;
+    struct ofputil_event_reply_msg reply;
+    struct ofpbuf *reply_buf;
+
+    LIST_FOR_EACH_SAFE(event,next_event,event_list_node,&(ofproto->event_list)){
+        if(event->event_id == rh->event_id){
+            event_id_exist = true;
+
+            if(event->event_type == rh->event_type){
+                VLOG_INFO("Delete event %u", event->event_id);
+                ofproto_event_delete_by_id(ofproto, rh->event_id);
+                reply.event_status = EVT_STATUS_REMOVED;
+                reply.event_type = rh->event_type;
+                reply.event_id = rh->event_id;
+                reply_buf = ofputil_encode_event_reply(oh,&reply);
+                ofconn_send_reply(ofconn,reply_buf);
+                VLOG_INFO("Event %u deleted.", rh->event_id);
+
+            }
+            else{
+                VLOG_INFO("Event %u found, but type is wrong.", rh->event_id);
+                reply.event_status = EVT_STATUS_WRONG_EVENT_TYPE;
+                reply.event_type = rh->event_type;
+                reply.event_id = EVT_EVENT_ID_ERR;
+                reply_buf = ofputil_encode_event_reply(oh,&reply);
+                ofconn_send_reply(ofconn,reply_buf);
+            }
+
+            break;
+        }
+
+    }
+
+    if( !event_id_exist ){
+        reply.event_status = EVT_STATUS_NO_EVENT_ID;
+        reply.event_type = rh->event_type;
+        reply.event_id = EVT_EVENT_ID_ERR;
+        reply_buf = ofputil_encode_event_reply(oh,&reply);
+        ofconn_send_reply(ofconn,reply_buf);
+    }
     return 0;
 }
 
@@ -6714,7 +6764,7 @@ handle_event_request(struct ofconn *ofconn, const struct ofp_header *oh )
         return handle_event_delete(ofconn, oh, &rh);
         default:
         VLOG_ERR("Unknown request type");
-        return 0; 
+        return OFPERR_OFPBRC_BAD_SUBTYPE;
     }
 
 
@@ -6736,18 +6786,6 @@ void event_wait
     }
 }
 
-
-/*
-void event_report
-(const struct ofproto *ofproto, const struct evt_event_report* report)
-{
-    //struct ofpbuf* report_msg;
-    VLOG_INFO("report to controller");
-    //report_msg = ofputil_encode_event_report(OFP10_VERSION ,report);
-    connmgr_send_event_report(ofproto->connmgr, report);
-}
-*/
-
 struct ofputil_event_port_timer_report* 
 event_port_timer_check( struct ofproto* ofproto, struct event_port_timer* port_timer )
 {
@@ -6767,8 +6805,8 @@ event_port_timer_check( struct ofproto* ofproto, struct event_port_timer* port_t
             port_stats.tx_packets >=
             port_timer -> prev_tx_packets + port_timer -> threshold_tx_packets){
 
-            VLOG_INFO("Triggered by TX packets, %"PRIu64" packets "
-                , port_stats.tx_packets - port_timer->prev_tx_packets);
+            /*VLOG_INFO("Triggered by TX packets, %"PRIu64" packets "
+                , port_stats.tx_packets - port_timer->prev_tx_packets);*/
             happened = true;
         }
     }
@@ -6778,8 +6816,8 @@ event_port_timer_check( struct ofproto* ofproto, struct event_port_timer* port_t
             port_stats.tx_bytes >= 
             port_timer->prev_tx_bytes + port_timer->threshold_tx_bytes){
 
-            VLOG_INFO("Triggered by TX bytes, %"PRIu64" bytes "
-                , port_stats.tx_bytes - port_timer->prev_tx_bytes);
+            /*VLOG_INFO("Triggered by TX bytes, %"PRIu64" bytes "
+                , port_stats.tx_bytes - port_timer->prev_tx_bytes);*/
             happened = true;
         }
     }
@@ -6789,8 +6827,8 @@ event_port_timer_check( struct ofproto* ofproto, struct event_port_timer* port_t
             port_stats.rx_packets >=
             port_timer->prev_rx_packets + port_timer->threshold_rx_packets){
 
-            VLOG_INFO("Triggered by RX packets, %"PRIu64" packets "
-                , port_stats.rx_packets - port_timer->prev_rx_packets);
+            /*VLOG_INFO("Triggered by RX packets, %"PRIu64" packets "
+                , port_stats.rx_packets - port_timer->prev_rx_packets);*/
             happened = true;
         }
     }
@@ -6800,8 +6838,8 @@ event_port_timer_check( struct ofproto* ofproto, struct event_port_timer* port_t
             port_stats.rx_bytes >= 
             port_timer->prev_rx_bytes + port_timer ->prev_rx_bytes){
 
-            VLOG_INFO("Triggered by RX bytes, %"PRIu64" bytes "
-                , port_stats.rx_bytes - port_timer->prev_rx_bytes);
+            /*VLOG_INFO("Triggered by RX bytes, %"PRIu64" bytes "
+                , port_stats.rx_bytes - port_timer->prev_rx_bytes);*/
             happened = true;
         }
     }
@@ -6858,8 +6896,8 @@ event_flow_timer_check(struct ofproto *ofproto, struct event_flow_timer *flow_ti
 
     rule_criteria_init( &criteria, flow_timer->out_port, &(flow_timer->match), 0, 0, 0, flow_timer->out_port, OFPG_ANY);
     
-    VLOG_INFO("Look for flows with match: %s in table %u, output at port %u",
-      match_to_string(&(flow_timer->match),0), flow_timer->table_id, flow_timer->out_port);
+    /*VLOG_INFO("Look for flows with match: %s in table %u, output at port %u",
+      match_to_string(&(flow_timer->match),0), flow_timer->table_id, flow_timer->out_port);*/
 
     ovs_mutex_lock(&ofproto_mutex);
     collect_rules_loose(ofproto, &criteria, &rules);
@@ -6883,7 +6921,7 @@ event_flow_timer_check(struct ofproto *ofproto, struct event_flow_timer *flow_ti
         bool is_new_rule = true;
         bool happened_single = false;
 
-        VLOG_INFO("Check single flow %u",i);
+        /*VLOG_INFO("Check single flow %u",i);*/
 
         ofproto->ofproto_class->rule_get_stats(rule, &packet_count,
                                                &byte_count, &used);
@@ -6898,7 +6936,7 @@ event_flow_timer_check(struct ofproto *ofproto, struct event_flow_timer *flow_ti
         }
 
         if( is_new_rule ){
-            VLOG_INFO("New rule");
+            /*VLOG_INFO("New rule");*/
             single_flow = xmalloc(sizeof *single_flow);
             ofproto_rule_ref(rule);
             single_flow -> exist = true;
@@ -6911,7 +6949,7 @@ event_flow_timer_check(struct ofproto *ofproto, struct event_flow_timer *flow_ti
             //list_insert( &(flow_timer->single_flows), &(single_flow->list_node) );
             hmap_insert( &(flow_timer->single_flows), &(single_flow->hmap_node), hash_pointer(rule,0));
 
-            VLOG_INFO("Added a new rule.");
+            /*VLOG_INFO("Added a new rule.");*/
         }
 
         if( (flow_timer->event_conditions & EVT_CONDITION_MATCH_PACKETS) != 0 ){
@@ -6955,7 +6993,7 @@ event_flow_timer_check(struct ofproto *ofproto, struct event_flow_timer *flow_ti
 
             flow_report->new_match_bytes 
             = byte_count + single_flow->additional_match_bytes - single_flow->prev_match_bytes;
-            VLOG_INFO("Happened on single flow %u",i);
+            /*VLOG_INFO("Happened on single flow %u",i);*/
         }
 
         single_flow->prev_match_packets = packet_count;
@@ -6970,12 +7008,12 @@ event_flow_timer_check(struct ofproto *ofproto, struct event_flow_timer *flow_ti
     //LIST_FOR_EACH_SAFE(single_flow,next_flow,list_node,&(flow_timer->single_flows)){
     HMAP_FOR_EACH_SAFE(single_flow,next_flow,hmap_node, &(flow_timer->single_flows)){
         if(single_flow->exist == false){
-            VLOG_INFO("remove a flow");
+            /*VLOG_INFO("remove a flow");*/
             //list_remove(&(single_flow->list_node));
             hmap_remove( &(flow_timer->single_flows), &(single_flow->hmap_node) );
-            /*ofproto_rule_unref(single_flow->rule);*/
+            ofproto_rule_unref(single_flow->rule);
             free(single_flow);
-            VLOG_INFO("remove flow -- done");
+            /*VLOG_INFO("remove flow -- done");*/
         }
     }
 
@@ -7013,23 +7051,24 @@ ofproto_event_run(struct ofproto *ofproto){
 
                 if(report != NULL){
                     struct ofputil_event_report_header report_header;
-                    struct ofpbuf *buf;
+                    //struct ofpbuf *buf;
                     
                     report_header.reason = EVT_REASON_TRIGGERED;
                     report_header.event_type = event->event_type;
                     report_header.event_id = event->event_id;
                     report_header.report_body.port_report = report;
-                    buf = ofputil_encode_event_port_timer_report(OFP10_VERSION,&report_header, report);
+
+                    /*buf = ofputil_encode_event_port_timer_report(OFP10_VERSION,&report_header, report);*/
 
                     connmgr_send_event_report(ofproto->connmgr,&report_header);
 
-                    VLOG_INFO("Event %u: port stats happened", event->event_id);
+                    /*VLOG_INFO("Event %u: port stats happened", event->event_id);
                     VLOG_INFO("New: TX packets = %"PRIu64", TX bytes = %"PRIu64", RX packets = %"PRIu64", RX bytes = %"PRIu64" ",
                       report->new_tx_packets, report->new_tx_bytes, report->new_rx_packets,report->new_rx_bytes);
                     VLOG_INFO("Total: TX packets = %"PRIu64", TX bytes = %"PRIu64", RX packets = %"PRIu64", RX bytes = %"PRIu64" ",
                       report->total_tx_packets, report->total_tx_bytes, report->total_rx_packets,report->total_rx_bytes);
 
-                    VLOG_INFO("Reported: %s", ofpbuf_to_string(buf,1024) );
+                    VLOG_INFO("Reported: %s", ofpbuf_to_string(buf,1024) );*/
                     //free(buf);
                     free(report);
                 }
@@ -7052,7 +7091,7 @@ ofproto_event_run(struct ofproto *ofproto){
             
             if(time_msec() >= flow_timer->next_check_time){
 
-                VLOG_INFO("now = %lld, time to check event %u ", time_msec(),event->event_id);
+                VLOG_INFO("now = %lld, time to check event %u on flow", time_msec(),event->event_id);
                 real_run = true;
                 report = event_flow_timer_check(ofproto,flow_timer);
 
@@ -7066,24 +7105,24 @@ ofproto_event_run(struct ofproto *ofproto){
                     report_header.event_id = event->event_id;
                     report_header.report_body.flow_report = report;
 
-                    buf = ofputil_encode_event_flow_timer_report(OFP10_VERSION,&report_header, report);
+                    //buf = ofputil_encode_event_flow_timer_report(OFP10_VERSION,&report_header, report);
                     connmgr_send_event_report( ofproto->connmgr, &report_header);
 
-                    VLOG_INFO("match = %s", match_to_string(&flow_timer->match,0) );
+                    //VLOG_INFO("match = %s", match_to_string(&flow_timer->match,0) );
 
                     LIST_FOR_EACH_SAFE(flow_report, next_flow_report,list_node, &report->single_flows){
 
-                        VLOG_INFO("single flow match = %s", match_to_string (&flow_report->match,0) );
+                        /*VLOG_INFO("single flow match = %s", match_to_string (&flow_report->match,0) );
                         VLOG_INFO("duration = %u seconds + %u nanoseconds", flow_report->duration_sec, flow_report->duration_nsec);
                         VLOG_INFO("New: matched packets = %"PRIu64", bytes = %"PRIu64" "
                             , flow_report->new_match_packets,flow_report->new_match_bytes);
                         VLOG_INFO("Total: matched packets = %"PRIu64", bytes = %"PRIu64" "
-                            , flow_report->total_match_packets,flow_report->total_match_bytes);
+                            , flow_report->total_match_packets,flow_report->total_match_bytes);*/
                         free(flow_report);
                     }
 
-                    VLOG_INFO("Reported flow event : %s", ofpbuf_to_string(buf,4096) );
-                    free(buf);
+                    //VLOG_INFO("Reported flow event : %s", ofpbuf_to_string(buf,4096) );
+                    //free(buf);
 
                     free(report);
                 }

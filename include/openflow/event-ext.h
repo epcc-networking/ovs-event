@@ -25,8 +25,8 @@ struct evt_flow_timer_config{
 };
 
 enum evt_event_id{
-    EVT_EVENT_MAX = 0xffffff00,
-    EVT_EVENT_ERR = 0xfffffff0,
+    EVT_EVENT_ID_MAX = 0xffffff00,
+    EVT_EVENT_ID_ERR = 0xfffffff0,
 };
 
 enum evt_event_request_type{
@@ -104,6 +104,10 @@ enum evt_event_reply_status{
     EVT_STATUS_UNSUPPORTED = 0x05,
     EVT_STATUS_NO_PORT     = 0x06,
     EVT_STATUS_NO_FLOW     = 0x07,
+
+
+    EVT_STATUS_WRONG_EVENT_TYPE = 0x0e,
+    EVT_STATUS_NO_EVENT_ID = 0x0f,
 
     EVT_STATUS_UNKNOWN_ERROR = 0xffff,
 };
