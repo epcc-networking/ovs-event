@@ -50,6 +50,8 @@ enum evt_port_condition{
 enum evt_flow_condition{
     EVT_CONDITION_MATCH_PACKETS = 0x01,
     EVT_CONDITION_MATCH_BYTES   = 0x02,
+    EVT_CONDITION_TOTAL_MATCH_PACKETS = 0x04,
+    EVT_CONDITION_TOTAL_MATCH_BYTES   = 0x08,
 };
 
 struct evt_event_request_header{
@@ -87,12 +89,16 @@ struct evt_event_request_flow_timer{
     uint8_t table_id;
     uint8_t pad;
     ovs_be16 out_port;
+    ovs_be64 flow_cookie;
+    ovs_be64 cookie_mask;
     ovs_be16 event_conditions;
     uint8_t pad2[2];
     ovs_be32 interval_sec;
     ovs_be32 interval_msec;
     ovs_be64 threshold_match_packets;
     ovs_be64 threshold_match_bytes;
+    ovs_be64 threshold_total_match_packets;
+    ovs_be64 threshold_total_match_bytes;
 };
 
 
@@ -160,6 +166,8 @@ struct evt_event_single_flow_report{
     uint8_t table_id;
     uint8_t pad;
     struct ofp10_match match;
+
+    ovs_be64 flow_cookie;
 
     ovs_be32 duration_sec;
     ovs_be32 duration_nsec;

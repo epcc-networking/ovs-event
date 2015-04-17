@@ -8983,12 +8983,18 @@ ofputil_decode_event_request_flow_timer(const struct ofp_header *oh,
     ofputil_match_from_ofp10_match ( &(request->match), &(event_req->match) );
     event_req -> table_id = request->table_id;
     event_req -> out_port = u16_to_ofp( ntohs ( request-> out_port) );
+
+    event_req -> flow_cookie = request->flow_cookie;
+    event_req -> cookie_mask = request->cookie_mask;
+
     event_req -> event_conditions = ntohs( request->event_conditions );
 
     event_req -> interval_sec = ntohl(request->interval_sec);
     event_req -> interval_msec = ntohl(request->interval_msec);
     event_req -> threshold_match_packets = ntohll(request->threshold_match_packets);
     event_req -> threshold_match_bytes   = ntohll(request->threshold_match_bytes);
+    event_req -> threshold_total_match_packets = ntohll(request->threshold_total_match_packets);
+    event_req -> threshold_total_match_bytes   = ntohll(request->threshold_total_match_bytes);
 
     return 0;
 
@@ -9005,7 +9011,7 @@ ofputil_encode_event_reply(const struct ofp_header *oh,
     msg = ofpbuf_put_zeros(b,sizeof *msg);
 
     msg->event_status = htons(reply->event_status);
-    msg->event_type = htons(reply->event_status);
+    msg->event_type = htons(reply->event_type);
     msg->event_id = htonl(reply->event_id);
 
     return b; 
@@ -9079,6 +9085,8 @@ ofputil_encode_event_flow_timer_report(enum ofp_version version,
 
         ofputil_match_to_ofp10_match( &single_flow->match, &sfr->match);
         sfr->table_id = single_flow->table_id;
+
+        sfr->flow_cookie = single_flow->flow_cookie;
 
         sfr->duration_sec = htonl(single_flow->duration_sec);
         sfr->duration_nsec = htonl(single_flow->duration_nsec);

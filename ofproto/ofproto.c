@@ -6429,10 +6429,11 @@ event_find_rules(struct ofproto* ofproto, const struct match* match, struct even
     uint64_t byte_count;
     long long int used;
 
-    VLOG_INFO("Look for flows with match: %s in table %u, output at port %u",
-      match_to_string(match,0), flow_timer->table_id, flow_timer->out_port);
+    VLOG_INFO("Look for flows with match: %s in table %u, output at port %u, cookie = %"PRIu64", mask = %"PRIu64" ", 
+      match_to_string(match,0), flow_timer->table_id, flow_timer->out_port,flow_timer->flow_cookie,flow_timer->cookie_mask);
 
-    rule_criteria_init( &criteria, flow_timer->table_id, match, 0, 0, 0, flow_timer->out_port, OFPG_ANY);
+    rule_criteria_init( &criteria, flow_timer->table_id, match, 0
+        , flow_timer->flow_cookie, flow_timer->cookie_mask, flow_timer->out_port, OFPG_ANY);
 
     ovs_mutex_lock(&ofproto_mutex);
     collect_rules_loose(ofproto, &criteria, &rules);
@@ -6453,6 +6454,7 @@ event_find_rules(struct ofproto* ofproto, const struct match* match, struct even
 
         minimatch_expand( &rule->cr.match, &rule_match);
         VLOG_INFO("Rule %u Rule match = %s", i, match_to_string(&rule_match,0) );
+        VLOG_INFO("Cookie = %"PRIu64" ", rule->flow_cookie);
         ofproto->ofproto_class->rule_get_stats(rule, &packet_count,
                                                &byte_count, &used);
         VLOG_INFO( "Packet count = %"PRIu64", byte count = %"PRIu64", used=%lld ", packet_count,byte_count,used );
@@ -6627,22 +6629,27 @@ handle_event_add(struct ofconn *ofconn, const struct ofp_header *oh,
         //list_init(&(flow_timer->single_flows) );
         hmap_init( &(flow_timer->single_flows) );
 
-        /*VLOG_INFO("Event ID = %"PRIu32", request type = %u, periodic = %u, event type = %u",
+        VLOG_INFO("Event ID = %"PRIu32", request type = %u, periodic = %u, event type = %u",
             event_req.event_id, event_req.request_type, event_req.periodic, event_req.event_type);
 
-        VLOG_INFO("Event on flow: match = %s | table ID = %u, out port = %u"
-            , match_to_string( &event_req.match, OFP_DEFAULT_PRIORITY ), event_req.table_id, event_req.out_port );*/
+        VLOG_INFO("Event on flow: match = %s | table ID = %u, out port = %u, flow cookie = %"PRIu64", mask = %"PRIu64" "
+            , match_to_string( &event_req.match, OFP_DEFAULT_PRIORITY ),
+             event_req.table_id, event_req.out_port,event_req.flow_cookie,event_req.cookie_mask );
 
         flow_timer -> event_conditions = event_req.event_conditions;
         flow_timer -> match = event_req.match;
         flow_timer -> table_id = event_req.table_id;
         flow_timer -> out_port = event_req.out_port;
+        flow_timer -> flow_cookie = event_req.flow_cookie;
+        flow_timer -> cookie_mask = event_req.cookie_mask;
 
         flow_timer -> interval_sec = event_req.interval_sec;
         flow_timer -> interval_msec = event_req.interval_msec;
 
         flow_timer -> threshold_match_packets = event_req.threshold_match_packets;
         flow_timer -> threshold_match_bytes = event_req.threshold_match_bytes;
+        flow_timer -> threshold_total_match_packets = event_req.threshold_total_match_packets;
+        flow_timer -> threshold_total_match_bytes = event_req.threshold_total_match_bytes;
 
         event_find_rules(ofconn_get_ofproto(ofconn), &event_req.match, flow_timer );
         event->flow_timer = flow_timer;
@@ -6884,6 +6891,7 @@ event_flow_timer_check(struct ofproto *ofproto, struct event_flow_timer *flow_ti
 
     bool happened = false;
     struct ofputil_event_flow_timer_report *report;
+    uint16_t flows_checked = 0,flows_added = 0,flows_removed = 0,flows_triggered = 0; 
 
     report = xmalloc(sizeof *report);
     report->event_type = EVT_FLOW_STATS_TIMER_TRIGGER;
@@ -6894,7 +6902,8 @@ event_flow_timer_check(struct ofproto *ofproto, struct event_flow_timer *flow_ti
     report->table_id = flow_timer->table_id;
     report->out_port = flow_timer->out_port;
 
-    rule_criteria_init( &criteria, flow_timer->out_port, &(flow_timer->match), 0, 0, 0, flow_timer->out_port, OFPG_ANY);
+    rule_criteria_init( &criteria, flow_timer->out_port, &(flow_timer->match), 0
+        , flow_timer->flow_cookie, flow_timer->cookie_mask, flow_timer->out_port, OFPG_ANY);
     
     /*VLOG_INFO("Look for flows with match: %s in table %u, output at port %u",
       match_to_string(&(flow_timer->match),0), flow_timer->table_id, flow_timer->out_port);*/
@@ -6912,7 +6921,7 @@ event_flow_timer_check(struct ofproto *ofproto, struct event_flow_timer *flow_ti
     
     }
 
-
+    flows_checked = rules.n;
 
     for(i = 0; i < rules.n; i++){
         struct rule* rule = rules.rules[i];
@@ -6945,7 +6954,7 @@ event_flow_timer_check(struct ofproto *ofproto, struct event_flow_timer *flow_ti
             single_flow -> prev_match_bytes   = 0;
             single_flow -> additional_match_packets = 0;
             single_flow -> additional_match_bytes   = 0;
-
+            flows_added++;
             //list_insert( &(flow_timer->single_flows), &(single_flow->list_node) );
             hmap_insert( &(flow_timer->single_flows), &(single_flow->hmap_node), hash_pointer(rule,0));
 
@@ -6971,9 +6980,31 @@ event_flow_timer_check(struct ofproto *ofproto, struct event_flow_timer *flow_ti
             }
         }
 
+        if( (flow_timer->event_conditions & EVT_CONDITION_TOTAL_MATCH_PACKETS ) != 0){
+            if(packet_count != ULLONG_MAX &&
+                single_flow-> prev_match_packets < flow_timer->threshold_total_match_packets
+                && packet_count >= flow_timer-> threshold_total_match_packets){
+
+                happened = true;
+                happened_single = true;
+            }
+        }
+
+        if( (flow_timer->event_conditions & EVT_CONDITION_TOTAL_MATCH_BYTES) != 0 ){
+            if(byte_count != ULLONG_MAX &&
+                single_flow->prev_match_bytes < flow_timer->threshold_total_match_bytes
+                && byte_count >= flow_timer->threshold_total_match_bytes){
+
+                happened = true;
+                happened_single = true;
+            }
+        }
+
         if(happened_single){
             struct ofputil_event_single_flow_report* flow_report;
             const struct rule_actions *actions = rule_get_actions(rule);
+
+            flows_triggered++;
 
             flow_report = xmalloc(sizeof *flow_report);
             list_insert( &report->single_flows, &flow_report->list_node);
@@ -6985,6 +7016,7 @@ event_flow_timer_check(struct ofproto *ofproto, struct event_flow_timer *flow_ti
             calc_duration(rule->created, time_msec(), &flow_report->duration_sec, &flow_report->duration_nsec);
 
             minimatch_expand( &(rule->cr.match), &(flow_report->match));
+            flow_report->flow_cookie = rule->flow_cookie;
             flow_report->total_match_packets = packet_count;
             flow_report->total_match_bytes   = byte_count;
 
@@ -7010,12 +7042,16 @@ event_flow_timer_check(struct ofproto *ofproto, struct event_flow_timer *flow_ti
         if(single_flow->exist == false){
             /*VLOG_INFO("remove a flow");*/
             //list_remove(&(single_flow->list_node));
+            flows_removed++;
             hmap_remove( &(flow_timer->single_flows), &(single_flow->hmap_node) );
             ofproto_rule_unref(single_flow->rule);
             free(single_flow);
             /*VLOG_INFO("remove flow -- done");*/
         }
     }
+
+    VLOG_INFO("%u flows checked, %u flows triggered, %u flows added, %u flows removed",
+        flows_checked,flows_triggered,flows_added,flows_removed);
 
     if(happened){
         return report;

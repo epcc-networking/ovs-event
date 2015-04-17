@@ -1158,12 +1158,16 @@ struct ofputil_event_request_flow_timer{
     struct match match;
     uint8_t table_id;
     ofp_port_t out_port;
+    ovs_be64 flow_cookie;
+    ovs_be64 cookie_mask;
     uint16_t event_conditions;
 
     uint32_t interval_sec;
     uint32_t interval_msec;
     uint64_t threshold_match_packets;
     uint64_t threshold_match_bytes;
+    uint64_t threshold_total_match_packets;
+    uint64_t threshold_total_match_bytes;
 };
 
 
@@ -1207,6 +1211,8 @@ struct ofputil_event_single_flow_report{
     struct ovs_list list_node;
     struct match match;
     uint8_t table_id;
+
+    ovs_be64 flow_cookie;
 
     uint32_t duration_sec;
     uint32_t duration_nsec;

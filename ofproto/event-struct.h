@@ -52,10 +52,15 @@ struct event_flow_timer{
     
     struct match match;
 
+    ovs_be64 flow_cookie;
+    ovs_be64 cookie_mask;
+
     uint16_t event_conditions;
 
     uint64_t threshold_match_packets;
     uint64_t threshold_match_bytes;
+    uint64_t threshold_total_match_packets;
+    uint64_t threshold_total_match_bytes;
 
     //struct ovs_list single_flows;
     struct hmap single_flows;
