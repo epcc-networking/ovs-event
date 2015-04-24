@@ -68,7 +68,6 @@ recirc_run(void)
     ovs_mutex_lock(&mutex);
     if (now - last > 250) {
         struct recirc_id_node *node, *next;
-
         last = now;
 
         /* Nodes in 'expiring' and 'expired' lists have the refcount of zero,

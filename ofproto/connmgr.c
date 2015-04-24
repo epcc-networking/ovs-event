@@ -1671,7 +1671,7 @@ connmgr_send_event_report(struct connmgr *mgr,
  const struct ofputil_event_report_header *erh)
 {
     struct ofconn *ofconn;
-
+    VLOG_INFO("Report sent to controller at %lld ", time_msec() );
     LIST_FOR_EACH(ofconn, node, &mgr->all_conns){
         struct ofpbuf *msg;
         if(erh->event_type == EVT_PORT_STATS_TIMER_TRIGGER){

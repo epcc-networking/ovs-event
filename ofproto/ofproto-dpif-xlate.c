@@ -4857,6 +4857,7 @@ xlate_actions(struct xlate_in *xin, struct xlate_out *xout)
                                            &ctx.table_id,
                                            flow->in_port.ofp_port, true, true);
         if (ctx.xin->resubmit_stats) {
+            /*VLOG_INFO("Resubmit stats");*/
             rule_dpif_credit_stats(rule, ctx.xin->resubmit_stats);
         }
         if (ctx.xin->xcache) {
@@ -5159,6 +5160,7 @@ xlate_push_stats(struct xlate_cache *xcache,
     XC_ENTRY_FOR_EACH (entry, entries, xcache) {
         switch (entry->type) {
         case XC_RULE:
+            /*VLOG_INFO("xlate_push_stats->XC_RULE");*/
             rule_dpif_credit_stats(entry->u.rule, stats);
             break;
         case XC_BOND:

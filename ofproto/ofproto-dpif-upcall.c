@@ -742,7 +742,6 @@ udpif_revalidator(void *arg)
     for (;;) {
         if (leader) {
             uint64_t reval_seq;
-
             recirc_run(); /* Recirculation cleanup. */
 
             reval_seq = seq_read(udpif->reval_seq);
@@ -758,6 +757,7 @@ udpif_revalidator(void *arg)
             udpif->reval_exit = latch_is_set(&udpif->exit_latch);
 
             start_time = time_msec();
+            /*VLOG_INFO("udpif_revalidator start at %lld",start_time);*/
             if (!udpif->reval_exit) {
                 bool terse_dump;
 
@@ -772,7 +772,7 @@ udpif_revalidator(void *arg)
             break;
         }
         revalidate(revalidator);
-
+        /*VLOG_INFO("revalidate done");*/
         /* Wait for all flows to have been dumped before we garbage collect. */
         ovs_barrier_block(&udpif->reval_barrier);
         revalidator_sweep(revalidator);
@@ -783,7 +783,7 @@ udpif_revalidator(void *arg)
         if (leader) {
             unsigned int flow_limit;
             long long int duration;
-
+            
             atomic_read_relaxed(&udpif->flow_limit, &flow_limit);
 
             dpif_flow_dump_destroy(udpif->dump);
@@ -806,7 +806,7 @@ udpif_revalidator(void *arg)
                 VLOG_INFO("Spent an unreasonably long %lldms dumping flows",
                           duration);
             }
-
+            /*VLOG_INFO("wait %lld (min(%lld,500) ) msec", (MIN(ofproto_max_idle, 500)) , ofproto_max_idle);*/
             poll_timer_wait_until(start_time + MIN(ofproto_max_idle, 500));
             seq_wait(udpif->reval_seq, last_reval_seq);
             latch_wait(&udpif->exit_latch);
@@ -1902,6 +1902,7 @@ revalidate(struct revalidator *revalidator)
     dump_seq = seq_read(udpif->dump_seq);
     reval_seq = seq_read(udpif->reval_seq);
     atomic_read_relaxed(&udpif->flow_limit, &flow_limit);
+    /*VLOG_INFO("create flow dump thread...");*/
     dump_thread = dpif_flow_dump_thread_create(udpif->dump);
     for (;;) {
         struct ukey_op ops[REVALIDATE_MAX_BATCH];
@@ -1922,7 +1923,7 @@ revalidate(struct revalidator *revalidator)
         }
 
         now = time_msec();
-
+        /*VLOG_INFO("%u dp flows dumped at %lld", n_dumped,now);*/
         /* In normal operation we want to keep flows around until they have
          * been idle for 'ofproto_max_idle' milliseconds.  However:
          *
@@ -1978,7 +1979,7 @@ revalidate(struct revalidator *revalidator)
             if (kill_them_all || (used && used < now - max_idle)) {
                 keep = false;
             } else {
-                keep = revalidate_ukey(udpif, ukey, &f->stats, reval_seq);
+                keep = revalidate_ukey(udpif, ukey, &f->stats, reval_seq);/*->xlate_push_stats()*/
             }
             ukey->dump_seq = dump_seq;
             ukey->flow_exists = keep;

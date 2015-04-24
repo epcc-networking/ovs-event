@@ -3669,6 +3669,7 @@ void
 rule_dpif_credit_stats(struct rule_dpif *rule,
                        const struct dpif_flow_stats *stats)
 {
+    /*VLOG_INFO("rule_dpif_credit_stats at %lld", time_msec() );*/
     ovs_mutex_lock(&rule->stats_mutex);
     rule->stats.n_packets += stats->n_packets;
     rule->stats.n_bytes += stats->n_bytes;
@@ -3956,6 +3957,8 @@ rule_get_stats(struct rule *rule_, uint64_t *packets, uint64_t *bytes,
                long long int *used)
 {
     struct rule_dpif *rule = rule_dpif_cast(rule_);
+
+    /*Refresh stats when read.*/
 
     ovs_mutex_lock(&rule->stats_mutex);
     *packets = rule->stats.n_packets;

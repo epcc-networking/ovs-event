@@ -6429,9 +6429,6 @@ event_find_rules(struct ofproto* ofproto, const struct match* match, struct even
     uint64_t byte_count;
     long long int used;
 
-    VLOG_INFO("Look for flows with match: %s in table %u, output at port %u, cookie = %"PRIu64", mask = %"PRIu64" ", 
-      match_to_string(match,0), flow_timer->table_id, flow_timer->out_port,flow_timer->flow_cookie,flow_timer->cookie_mask);
-
     rule_criteria_init( &criteria, flow_timer->table_id, match, 0
         , flow_timer->flow_cookie, flow_timer->cookie_mask, flow_timer->out_port, OFPG_ANY);
 
@@ -6442,7 +6439,7 @@ event_find_rules(struct ofproto* ofproto, const struct match* match, struct even
     rule_collection_ref(&rules);
     ovs_mutex_unlock(&ofproto_mutex);
 
-    VLOG_INFO("%u rules found", rules.n);
+
     for( i = 0; i < rules.n; i++){
         struct rule *rule = rules.rules[i];
         struct match rule_match;
@@ -6453,11 +6450,10 @@ event_find_rules(struct ofproto* ofproto, const struct match* match, struct even
         single_flow -> rule = rule;
 
         minimatch_expand( &rule->cr.match, &rule_match);
-        VLOG_INFO("Rule %u Rule match = %s", i, match_to_string(&rule_match,0) );
-        VLOG_INFO("Cookie = %"PRIu64" ", rule->flow_cookie);
+
         ofproto->ofproto_class->rule_get_stats(rule, &packet_count,
                                                &byte_count, &used);
-        VLOG_INFO( "Packet count = %"PRIu64", byte count = %"PRIu64", used=%lld ", packet_count,byte_count,used );
+        
         single_flow -> prev_match_packets = packet_count;
         single_flow -> prev_match_bytes = byte_count;
         single_flow -> additional_match_packets = 0;
@@ -6465,7 +6461,7 @@ event_find_rules(struct ofproto* ofproto, const struct match* match, struct even
 
         //list_insert( &(flow_timer->single_flows), &(single_flow->list_node) );
         hmap_insert( &(flow_timer->single_flows), &(single_flow->hmap_node), hash_pointer(rule,0) );
-        VLOG_INFO("==========Inserted one single flow==========");
+      
     }
 
     rule_collection_unref(&rules);
@@ -6571,30 +6567,6 @@ handle_event_add(struct ofconn *ofconn, const struct ofp_header *oh,
         port_timer = xmalloc(sizeof *port_timer);
         error = ofputil_decode_event_request_port_timer(oh,&event_req);
 
-
-        /*VLOG_INFO("Event on port %u", event_req.check_port);
-        VLOG_INFO("interval = %u seconds + %u milliseconds "
-            ,event_req.interval_sec,event_req.interval_msec);
-        if( (event_req.event_conditions & EVT_CONDITION_TX_PACKETS) != 0 ){
-            VLOG_INFO("Triggered if TX packets over %"PRIu64" "
-                ,event_req.threshold_tx_packets);
-        }
-
-        if( (event_req.event_conditions & EVT_CONDITION_TX_BYTES) != 0){
-            VLOG_INFO("Triggered if TX bytes over %"PRIu64" "
-                ,event_req.threshold_tx_bytes);
-        }
-
-        if( (event_req.event_conditions & EVT_CONDITION_RX_PACKETS) != 0 ){
-            VLOG_INFO("Triggered if RX packets over %"PRIu64" "
-                ,event_req.threshold_rx_packets);
-        }
-
-        if( (event_req.event_conditions & EVT_CONDITION_RX_BYTES) != 0){
-            VLOG_INFO("Triggered if RX bytes over %"PRIu64" "
-                ,event_req.threshold_rx_bytes);
-        }*/
-
         port_timer->check_port = event_req.check_port;
         port_timer->event_conditions = event_req.event_conditions;
         port_timer->interval_sec = event_req.interval_sec;
@@ -6628,13 +6600,6 @@ handle_event_add(struct ofconn *ofconn, const struct ofp_header *oh,
         flow_timer = xmalloc(sizeof *flow_timer);
         //list_init(&(flow_timer->single_flows) );
         hmap_init( &(flow_timer->single_flows) );
-
-        VLOG_INFO("Event ID = %"PRIu32", request type = %u, periodic = %u, event type = %u",
-            event_req.event_id, event_req.request_type, event_req.periodic, event_req.event_type);
-
-        VLOG_INFO("Event on flow: match = %s | table ID = %u, out port = %u, flow cookie = %"PRIu64", mask = %"PRIu64" "
-            , match_to_string( &event_req.match, OFP_DEFAULT_PRIORITY ),
-             event_req.table_id, event_req.out_port,event_req.flow_cookie,event_req.cookie_mask );
 
         flow_timer -> event_conditions = event_req.event_conditions;
         flow_timer -> match = event_req.match;
@@ -6930,7 +6895,7 @@ event_flow_timer_check(struct ofproto *ofproto, struct event_flow_timer *flow_ti
         bool is_new_rule = true;
         bool happened_single = false;
 
-        /*VLOG_INFO("Check single flow %u",i);*/
+
 
         ofproto->ofproto_class->rule_get_stats(rule, &packet_count,
                                                &byte_count, &used);
@@ -6945,7 +6910,7 @@ event_flow_timer_check(struct ofproto *ofproto, struct event_flow_timer *flow_ti
         }
 
         if( is_new_rule ){
-            /*VLOG_INFO("New rule");*/
+
             single_flow = xmalloc(sizeof *single_flow);
             ofproto_rule_ref(rule);
             single_flow -> exist = true;
@@ -6958,7 +6923,6 @@ event_flow_timer_check(struct ofproto *ofproto, struct event_flow_timer *flow_ti
             //list_insert( &(flow_timer->single_flows), &(single_flow->list_node) );
             hmap_insert( &(flow_timer->single_flows), &(single_flow->hmap_node), hash_pointer(rule,0));
 
-            /*VLOG_INFO("Added a new rule.");*/
         }
 
         if( (flow_timer->event_conditions & EVT_CONDITION_MATCH_PACKETS) != 0 ){
@@ -7050,8 +7014,8 @@ event_flow_timer_check(struct ofproto *ofproto, struct event_flow_timer *flow_ti
         }
     }
 
-    VLOG_INFO("%u flows checked, %u flows triggered, %u flows added, %u flows removed",
-        flows_checked,flows_triggered,flows_added,flows_removed);
+    /*VLOG_INFO("%u flows checked, %u flows triggered, %u flows added, %u flows removed",
+        flows_checked,flows_triggered,flows_added,flows_removed);*/
 
     if(happened){
         return report;
@@ -7067,9 +7031,9 @@ void
 ofproto_event_run(struct ofproto *ofproto){
     struct event* event;
     
-    struct timeval start;
+    /*struct timeval start;
     struct timeval end;
-    xgettimeofday(&start);
+    xgettimeofday(&start);*/
     bool real_run = false;
 
     LIST_FOR_EACH(event,event_list_node, &(ofproto->event_list)){
@@ -7080,8 +7044,8 @@ ofproto_event_run(struct ofproto *ofproto){
                 struct ofputil_event_port_timer_report *report;
                 real_run = true;
 
-                VLOG_INFO("now = %lld, time to check event %u ", time_msec(),event->event_id);
-                VLOG_INFO("check port %u...",event->port_timer->check_port);
+                /*VLOG_INFO("now = %lld, time to check event %u ", time_msec(),event->event_id);
+                VLOG_INFO("check port %u...",event->port_timer->check_port);*/
 
                 report =  event_port_timer_check( ofproto, event->port_timer);
 
@@ -7095,7 +7059,7 @@ ofproto_event_run(struct ofproto *ofproto){
                     report_header.report_body.port_report = report;
 
                     /*buf = ofputil_encode_event_port_timer_report(OFP10_VERSION,&report_header, report);*/
-
+                    VLOG_INFO("Event %u on port happened at %lld. send to controller.", event->event_id, time_msec());
                     connmgr_send_event_report(ofproto->connmgr,&report_header);
 
                     /*VLOG_INFO("Event %u: port stats happened", event->event_id);
@@ -7127,7 +7091,7 @@ ofproto_event_run(struct ofproto *ofproto){
             
             if(time_msec() >= flow_timer->next_check_time){
 
-                VLOG_INFO("now = %lld, time to check event %u on flow", time_msec(),event->event_id);
+                /*VLOG_INFO("now = %lld, time to check event %u on flow", time_msec(),event->event_id);*/
                 real_run = true;
                 report = event_flow_timer_check(ofproto,flow_timer);
 
@@ -7142,6 +7106,7 @@ ofproto_event_run(struct ofproto *ofproto){
                     report_header.report_body.flow_report = report;
 
                     //buf = ofputil_encode_event_flow_timer_report(OFP10_VERSION,&report_header, report);
+                    VLOG_INFO("Event %u on flows happened at %lld. send to controller.", event->event_id, time_msec());
                     connmgr_send_event_report( ofproto->connmgr, &report_header);
 
                     //VLOG_INFO("match = %s", match_to_string(&flow_timer->match,0) );
@@ -7174,9 +7139,9 @@ ofproto_event_run(struct ofproto *ofproto){
         }
     }
 
-    xgettimeofday(&end);
-    if(real_run)
-        VLOG_INFO("Event-run, cost %lld usecs", 1000000LL * (end.tv_sec - start.tv_sec) + end.tv_usec - start.tv_usec);
+    /*xgettimeofday(&end);*/
+    /*f(real_run)
+        VLOG_INFO("Event-run, cost %lld usecs", 1000000LL * (end.tv_sec - start.tv_sec) + end.tv_usec - start.tv_usec);*/
 }
 
 

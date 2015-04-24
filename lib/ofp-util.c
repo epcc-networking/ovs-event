@@ -9058,7 +9058,7 @@ ofputil_encode_event_port_timer_report(enum ofp_version version,
     port_report -> total_tx_packets = htonll(report->total_tx_packets);
     port_report -> total_tx_bytes = htonll(report->total_tx_bytes);
     port_report -> total_rx_packets = htonll(report->total_rx_packets);
-    port_report -> total_rx_bytes  = htonll(report->total_tx_bytes);
+    port_report -> total_rx_bytes  = htonll(report->total_rx_bytes);
 
     return b;
 }
