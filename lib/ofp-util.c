@@ -8945,6 +8945,7 @@ ofputil_decode_event_request_port_timer(const struct ofp_header *oh,
     raw = ofpraw_pull_assert(&b);
 
     request =  ofpbuf_pull(&b, sizeof *request);
+    VLOG_INFO("size = %u",sizeof *request);
     event_req -> event_id = ntohl(request -> event_id);
     event_req -> request_type = request -> request_type; 
     event_req -> periodic = request -> periodic;
@@ -8954,11 +8955,19 @@ ofputil_decode_event_request_port_timer(const struct ofp_header *oh,
     event_req -> event_conditions = ntohs(request->event_conditions);
     event_req -> interval_sec = ntohl(request->interval_sec);
     event_req -> interval_msec = ntohl(request->interval_msec);
-    event_req -> threshold_tx_packets = ntohll(request->threshold_tx_packets);
-    event_req -> threshold_tx_bytes = ntohll(request->threshold_tx_bytes);
-    event_req -> threshold_rx_packets = ntohll(request->threshold_rx_packets);
-    event_req -> threshold_rx_bytes = ntohll(request->threshold_rx_bytes);
-
+    event_req -> threshold_tx_packets 
+        = ntohll(get_32aligned_be64(&request->threshold_tx_packets) );
+    event_req -> threshold_tx_bytes 
+        = ntohll(get_32aligned_be64 (&request->threshold_tx_bytes) );
+    event_req -> threshold_rx_packets
+        = ntohll(get_32aligned_be64(&request->threshold_rx_packets) );
+    event_req -> threshold_rx_bytes
+        = ntohll(get_32aligned_be64(&request->threshold_rx_bytes) );
+    VLOG_INFO("Check port %u, interval = %us+%ums"
+        ,event_req->check_port,event_req->interval_sec,event_req->interval_msec);
+    VLOG_INFO("Threshold: TX packets=%"PRIu64", TX bytes= %"PRIu64", RX packets=%"PRIu64", RX bytes=%"PRIu64" "
+        ,event_req -> threshold_tx_packets, event_req -> threshold_tx_bytes
+        ,event_req -> threshold_rx_packets, event_req -> threshold_rx_bytes);
     return 0;
 }
 
@@ -8975,26 +8984,31 @@ ofputil_decode_event_request_flow_timer(const struct ofp_header *oh,
     raw = ofpraw_pull_assert(&b);
 
     request = ofpbuf_pull(&b, sizeof *request);
-
+    VLOG_INFO_ONCE("req size = %u",sizeof *request);
     event_req -> event_id = ntohl(request -> event_id);
     event_req -> request_type = request -> request_type; 
     event_req -> periodic = request -> periodic;
     event_req -> event_type = ntohs( request -> event_type);
     ofputil_match_from_ofp10_match ( &(request->match), &(event_req->match) );
+    VLOG_INFO_ONCE("offset of match = %ld", (void *)&(request->match) - (void *)request);
     event_req -> table_id = request->table_id;
     event_req -> out_port = u16_to_ofp( ntohs ( request-> out_port) );
-
-    event_req -> flow_cookie = request->flow_cookie;
-    event_req -> cookie_mask = request->cookie_mask;
+    VLOG_INFO_ONCE("offset of cookie = %ld", (void *)&(request->flow_cookie) - (void *)request);
+    event_req -> flow_cookie = get_32aligned_be64(&request->flow_cookie);
+    event_req -> cookie_mask = get_32aligned_be64(&request->cookie_mask);
 
     event_req -> event_conditions = ntohs( request->event_conditions );
 
     event_req -> interval_sec = ntohl(request->interval_sec);
     event_req -> interval_msec = ntohl(request->interval_msec);
-    event_req -> threshold_match_packets = ntohll(request->threshold_match_packets);
-    event_req -> threshold_match_bytes   = ntohll(request->threshold_match_bytes);
-    event_req -> threshold_total_match_packets = ntohll(request->threshold_total_match_packets);
-    event_req -> threshold_total_match_bytes   = ntohll(request->threshold_total_match_bytes);
+    event_req -> threshold_match_packets 
+        = ntohll( get_32aligned_be64(&request->threshold_match_packets) );
+    event_req -> threshold_match_bytes   
+        = ntohll( get_32aligned_be64(&request->threshold_match_bytes) );
+    event_req -> threshold_total_match_packets 
+        = ntohll( get_32aligned_be64(&request->threshold_total_match_packets) );
+    event_req -> threshold_total_match_bytes   
+        = ntohll( get_32aligned_be64(&request->threshold_total_match_bytes) );
 
     return 0;
 
@@ -9050,15 +9064,15 @@ ofputil_encode_event_port_timer_report(enum ofp_version version,
     port_report -> interval_sec = htonl(report->interval_sec);
     port_report -> interval_msec = htonl(report->interval_msec);
 
-    port_report -> new_tx_packets = htonll(report->new_tx_packets);
-    port_report -> new_tx_bytes = htonll(report->new_tx_bytes);
-    port_report -> new_rx_packets = htonll(report->new_rx_packets);
-    port_report -> new_rx_bytes = htonll(report->new_rx_bytes);
+    put_32aligned_be64(&port_report->new_tx_packets,htonll(report->new_tx_packets) );
+    put_32aligned_be64(&port_report->new_tx_bytes,htonll(report->new_tx_bytes) );
+    put_32aligned_be64(&port_report->new_rx_packets,htonll(report->new_rx_packets) );
+    put_32aligned_be64(&port_report->new_rx_bytes,htonll(report->new_rx_bytes) );
 
-    port_report -> total_tx_packets = htonll(report->total_tx_packets);
-    port_report -> total_tx_bytes = htonll(report->total_tx_bytes);
-    port_report -> total_rx_packets = htonll(report->total_rx_packets);
-    port_report -> total_rx_bytes  = htonll(report->total_rx_bytes);
+    put_32aligned_be64(&port_report->total_tx_packets,htonll(report->total_tx_packets) );
+    put_32aligned_be64(&port_report->total_tx_bytes,htonll(report->total_tx_bytes) );
+    put_32aligned_be64(&port_report->total_rx_packets,htonll(report->total_rx_packets) );
+    put_32aligned_be64(&port_report->total_rx_bytes,htonll(report->total_rx_bytes) );
 
     return b;
 }
@@ -9086,15 +9100,21 @@ ofputil_encode_event_flow_timer_report(enum ofp_version version,
         ofputil_match_to_ofp10_match( &single_flow->match, &sfr->match);
         sfr->table_id = single_flow->table_id;
 
-        sfr->flow_cookie = single_flow->flow_cookie;
-
+        put_32aligned_be64(&sfr->flow_cookie,single_flow->flow_cookie);
+        
         sfr->duration_sec = htonl(single_flow->duration_sec);
         sfr->duration_nsec = htonl(single_flow->duration_nsec);
 
-        sfr->new_match_packets = htonll(single_flow->new_match_packets);
+        /*sfr->new_match_packets = htonll(single_flow->new_match_packets);
         sfr->new_match_bytes = htonll(single_flow->new_match_bytes);
         sfr->total_match_packets = htonll(single_flow->total_match_packets);
-        sfr->total_match_bytes = htonll(single_flow->total_match_bytes);
+        sfr->total_match_bytes = htonll(single_flow->total_match_bytes);*/
+
+        put_32aligned_be64(&sfr->new_match_packets
+            ,htonll(single_flow->new_match_packets) );
+        put_32aligned_be64(&sfr->new_match_bytes, htonll(single_flow->new_match_bytes) );
+        put_32aligned_be64(&sfr->total_match_packets,htonll(single_flow->total_match_packets) );
+        put_32aligned_be64(&sfr->total_match_bytes,htonll(single_flow->total_match_bytes) );
 
         sfr->length = htons( sizeof *sfr  + single_flow->ofpacts_len );
         ofpacts_put_openflow_actions(single_flow->ofpacts, single_flow->ofpacts_len, b, version);
