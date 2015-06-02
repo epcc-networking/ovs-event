@@ -8971,11 +8971,13 @@ ofputil_decode_event_request_port_timer(const struct ofp_header *oh,
     return 0;
 }
 
-enum ofperr 
-ofputil_decode_event_request_flow_timer(const struct ofp_header *oh,
-                             struct ofputil_event_request_flow_timer *event_req)
+
+static enum ofperr 
+ofputil_decode_ofp10_event_request_flow_timer(const struct ofp_header *oh,
+                        struct ofputil_event_request_flow_timer *event_req)
 {
-    const struct evt_event_request_flow_timer *request;
+
+    const struct evt_event_request_flow_timer_ofp10 *request;
     struct ofpbuf b;
     uint16_t length =  ntohs(oh->length);
     enum ofpraw raw;
@@ -8989,7 +8991,12 @@ ofputil_decode_event_request_flow_timer(const struct ofp_header *oh,
     event_req -> request_type = request -> request_type; 
     event_req -> periodic = request -> periodic;
     event_req -> event_type = ntohs( request -> event_type);
+    
     ofputil_match_from_ofp10_match ( &(request->match), &(event_req->match) );
+    event_req->out_group = OFPG_ANY;
+    event_req->out_port = u16_to_ofp( ntohs ( request-> out_port) );
+
+    
     VLOG_INFO_ONCE("offset of match = %ld", (void *)&(request->match) - (void *)request);
     event_req -> table_id = request->table_id;
     event_req -> out_port = u16_to_ofp( ntohs ( request-> out_port) );
@@ -9012,6 +9019,84 @@ ofputil_decode_event_request_flow_timer(const struct ofp_header *oh,
 
     return 0;
 
+}
+
+static enum ofperr
+ofputil_decode_ofp11_event_request_flow_timer(const struct ofp_header *oh,
+                                            struct ofputil_event_request_flow_timer *event_req )
+{
+    const struct evt_event_request_flow_timer_ofp11 *request;
+    struct ofpbuf b;
+    uint16_t length = ntohs(oh->length);
+    enum ofpraw raw;
+
+    VLOG_INFO("length = %d\n",length);
+
+    ofpbuf_use_const(&b,oh,length);
+    raw = ofpraw_pull_assert(&b);
+
+    request = ofpbuf_pull(&b, sizeof *request);
+    event_req->event_id = ntohl(request->event_id);
+    event_req -> request_type = request -> request_type; 
+    event_req -> periodic = request -> periodic;
+    event_req -> event_type = ntohs(request->event_type);
+
+    VLOG_INFO("request type = %d, periodic = %d, event_type = %d, event_id = %d",
+        event_req -> request_type,event_req->periodic,event_req->event_type,event_req->event_id);
+
+    event_req -> table_id = request->table_id;
+    ofputil_port_from_ofp11(request->out_port,&event_req->out_port);
+    event_req->out_group = ntohl(request->out_group);
+
+    event_req -> flow_cookie = get_32aligned_be64(&request->flow_cookie);
+    event_req -> cookie_mask = get_32aligned_be64(&request->cookie_mask);
+
+    event_req -> event_conditions = ntohs( request->event_conditions );
+
+    event_req -> interval_sec = ntohl(request->interval_sec);
+    event_req -> interval_msec = ntohl(request->interval_msec);
+    VLOG_INFO("interval = %"PRIu32" seconds + %"PRIu32" milliseconds ",
+        event_req->interval_sec,event_req->interval_msec);
+    event_req -> threshold_match_packets 
+        = ntohll( get_32aligned_be64(&request->threshold_match_packets) );
+    event_req -> threshold_match_bytes   
+        = ntohll( get_32aligned_be64(&request->threshold_match_bytes) );
+    event_req -> threshold_total_match_packets 
+        = ntohll( get_32aligned_be64(&request->threshold_total_match_packets) );
+    event_req -> threshold_total_match_bytes   
+        = ntohll( get_32aligned_be64(&request->threshold_total_match_bytes) );
+
+    VLOG_INFO("event conditon = %u", event_req->event_conditions);
+    VLOG_INFO("Thresholds: new match packets %"PRIu64", new match bytes %"PRIu64", total match packets %"PRIu64", total match bytes %"PRIu64" ",
+        event_req -> threshold_match_packets, event_req -> threshold_match_bytes, 
+        event_req -> threshold_total_match_packets, event_req -> threshold_total_match_bytes);
+
+    VLOG_INFO("output port = %d, output group = %u, flow cookie = %"PRIu64", cookie mask = %"PRIu64" ",
+        event_req->out_port, event_req->out_group, event_req->flow_cookie,event_req->cookie_mask);
+    ofputil_pull_ofp11_match(&b, &event_req->match, NULL);
+    VLOG_INFO("match = %s",match_to_string(&event_req->match, OFP_DEFAULT_PRIORITY) );
+
+
+    return 0; 
+
+
+}
+
+enum ofperr
+ofputil_decode_event_request_flow_timer(const struct ofp_header *oh,
+                                      struct ofputil_event_request_flow_timer *event_req )
+{
+    if (oh -> version == OFP10_VERSION){
+        VLOG_INFO("decode event request on flow stats on openflow 1.0");
+        return ofputil_decode_ofp10_event_request_flow_timer(oh,event_req);
+    }
+    else if(oh -> version >= OFP11_VERSION){
+        VLOG_INFO("decode event request on flow stats on openflow 1.1+");
+        return ofputil_decode_ofp11_event_request_flow_timer(oh,event_req);
+    }
+    else{
+        OVS_NOT_REACHED();
+    }
 }
 
 struct ofpbuf*
@@ -9078,13 +9163,13 @@ ofputil_encode_event_port_timer_report(enum ofp_version version,
 }
 
 struct ofpbuf* 
-ofputil_encode_event_flow_timer_report(enum ofp_version version,
+ofputil_encode_ofp10_event_flow_timer_report(enum ofp_version version,
                                  const struct ofputil_event_report_header* rh,
                                  const struct ofputil_event_flow_timer_report* report)
 {
     struct ofpbuf *b = ofputil_encode_event_report_header(version,rh);
-    struct evt_event_flow_timer_report_header *efrh;
-    struct evt_event_single_flow_report *sfr;
+    struct evt_event_flow_timer_report_header_ofp10 *efrh;
+    struct evt_event_single_flow_report_ofp10 *sfr;
     struct ofputil_event_single_flow_report *single_flow; 
 
     efrh = ofpbuf_put_zeros(b,sizeof *efrh);
@@ -9124,4 +9209,79 @@ ofputil_encode_event_flow_timer_report(enum ofp_version version,
     return b;
 
 }
+
+struct ofpbuf*
+ofputil_encode_ofp11_event_flow_timer_report( enum ofp_version version,
+                                 const struct ofputil_event_report_header* rh,
+                                 const struct ofputil_event_flow_timer_report* report)
+{
+    struct ofpbuf *b = ofputil_encode_event_report_header(version,rh);
+
+    struct evt_event_flow_timer_report_header_ofp11 *efrh;
+    struct evt_event_single_flow_report_ofp11 *sfr;
+    struct ofputil_event_single_flow_report *single_flow;
+    int match_len = 0;
+    enum ofputil_protocol oxm_protocol = ofputil_protocol_from_ofp_version(version);
+    efrh = ofpbuf_put_zeros(b,sizeof *efrh); 
+
+    efrh->table_id = report->table_id;
+    efrh->out_port = htonl(report->out_port);
+    efrh->out_group = htonl(report->out_group);
+    efrh->interval_sec = htonl(report->interval_sec);
+    efrh->interval_msec = htonl(report->interval_msec);
+    match_len = ofputil_put_ofp11_match(b,&report->match,oxm_protocol);
+    if(match_len % 8 != 0){
+        match_len += (8 - match_len % 8);
+    }
+
+    LIST_FOR_EACH(single_flow,list_node,&(report->single_flows) ){
+        int match_len,inst_len;
+        size_t size_before;
+        size_before = b->size;
+        VLOG_INFO("encoding on single flow..");
+        sfr = ofpbuf_put_zeros(b,sizeof *sfr); 
+        sfr->table_id = single_flow->table_id;
+        put_32aligned_be64(&sfr->flow_cookie,single_flow->flow_cookie);
+        
+        sfr->duration_sec = htonl(single_flow->duration_sec);
+        sfr->duration_nsec = htonl(single_flow->duration_nsec);
+        put_32aligned_be64(&sfr->new_match_packets
+            ,htonll(single_flow->new_match_packets) );
+        put_32aligned_be64(&sfr->new_match_bytes, htonll(single_flow->new_match_bytes) );
+        put_32aligned_be64(&sfr->total_match_packets,htonll(single_flow->total_match_packets) );
+        put_32aligned_be64(&sfr->total_match_bytes,htonll(single_flow->total_match_bytes) );
+
+        match_len = ofputil_put_ofp11_match(b,&single_flow->match,oxm_protocol);
+        if(match_len % 8 != 0){
+            match_len += (8 - match_len % 8);
+        }
+
+        ofpacts_put_openflow_instructions(single_flow->ofpacts,single_flow->ofpacts_len,b,version);
+
+        sfr->length = htons(b->size - size_before);
+        VLOG_INFO("length = %u\n", ntohs(sfr->length) );
+    }
+
+    return b;
+
+}
+
+struct ofpbuf* 
+ofputil_encode_event_flow_timer_report(enum ofp_version version,
+                                    const struct ofputil_event_report_header* rh,
+                                 const struct ofputil_event_flow_timer_report* report)
+{
+
+    if (version == OFP10_VERSION){
+        return ofputil_encode_ofp10_event_flow_timer_report(version,rh,report);
+    }
+
+    else if (version >= OFP11_VERSION){
+        return ofputil_encode_ofp11_event_flow_timer_report(version,rh,report);
+    }
+    else{
+        OVS_NOT_REACHED();
+    }
+}
+
 /* End of event related things. */

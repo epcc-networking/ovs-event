@@ -6430,7 +6430,7 @@ event_find_rules(struct ofproto* ofproto, const struct match* match, struct even
     long long int used;
 
     rule_criteria_init( &criteria, flow_timer->table_id, match, 0
-        , flow_timer->flow_cookie, flow_timer->cookie_mask, flow_timer->out_port, OFPG_ANY);
+        , flow_timer->flow_cookie, flow_timer->cookie_mask, flow_timer->out_port, flow_timer->out_group);
 
     ovs_mutex_lock(&ofproto_mutex);
     collect_rules_loose(ofproto, &criteria, &rules);
@@ -6605,6 +6605,7 @@ handle_event_add(struct ofconn *ofconn, const struct ofp_header *oh,
         flow_timer -> match = event_req.match;
         flow_timer -> table_id = event_req.table_id;
         flow_timer -> out_port = event_req.out_port;
+        flow_timer -> out_group = event_req.out_group;
         flow_timer -> flow_cookie = event_req.flow_cookie;
         flow_timer -> cookie_mask = event_req.cookie_mask;
 
@@ -6866,6 +6867,7 @@ event_flow_timer_check(struct ofproto *ofproto, struct event_flow_timer *flow_ti
     report->interval_msec = flow_timer->interval_msec;
     report->table_id = flow_timer->table_id;
     report->out_port = flow_timer->out_port;
+    report->out_group = flow_timer->out_group;
 
     rule_criteria_init( &criteria, flow_timer->out_port, &(flow_timer->match), 0
         , flow_timer->flow_cookie, flow_timer->cookie_mask, flow_timer->out_port, OFPG_ANY);
@@ -7014,8 +7016,8 @@ event_flow_timer_check(struct ofproto *ofproto, struct event_flow_timer *flow_ti
         }
     }
 
-    /*VLOG_INFO("%u flows checked, %u flows triggered, %u flows added, %u flows removed",
-        flows_checked,flows_triggered,flows_added,flows_removed);*/
+    VLOG_INFO("%u flows checked, %u flows triggered, %u flows added, %u flows removed",
+        flows_checked,flows_triggered,flows_added,flows_removed);
 
     if(happened){
         return report;

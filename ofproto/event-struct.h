@@ -48,6 +48,7 @@ struct event_flow_timer{
     uint32_t interval_msec;
 
     ofp_port_t out_port;
+    uint32_t out_group;
     uint8_t table_id;    
     
     struct match match;

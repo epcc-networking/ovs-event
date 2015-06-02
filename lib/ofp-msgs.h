@@ -422,13 +422,13 @@ enum ofpraw {
 
 /* Event related messages. */
 
-    /* EPCC 1.0 (0): uint8_t[]. */
+    /* EPCC 1.0+ (0): uint8_t[]. */
     OFPRAW_EPCC_EVENT_REQUEST,
 
-    /* EPCC 1.0 (1): uint8_t[]. */
+    /* EPCC 1.0+ (1): uint8_t[]. */
     OFPRAW_EPCC_EVENT_REPLY,
 
-    /* EPCC 1.0 (2): uint8_t[]. */
+    /* EPCC 1.0+ (2): uint8_t[]. */
     OFPRAW_EPCC_EVENT_REPORT,
 };
 

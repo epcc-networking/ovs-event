@@ -79,7 +79,7 @@ struct evt_event_request_port_timer{
     ovs_32aligned_be64 threshold_rx_bytes;
 };
 
-struct evt_event_request_flow_timer{
+struct evt_event_request_flow_timer_ofp10{
     
     uint8_t  request_type;
     uint8_t  periodic;
@@ -99,6 +99,35 @@ struct evt_event_request_flow_timer{
     ovs_32aligned_be64 threshold_match_bytes;
     ovs_32aligned_be64 threshold_total_match_packets;
     ovs_32aligned_be64 threshold_total_match_bytes;
+};
+
+struct evt_event_request_flow_timer_ofp11{
+    uint8_t request_type;
+    uint8_t periodic;
+    ovs_be16 event_type;
+    ovs_be32 event_id;
+
+    ovs_be16 event_conditions;
+    uint8_t pad[2];
+
+    ovs_be32 interval_sec;
+    ovs_be32 interval_msec;
+
+    ovs_32aligned_be64 threshold_match_packets;
+    ovs_32aligned_be64 threshold_match_bytes;
+    ovs_32aligned_be64 threshold_total_match_packets;
+    ovs_32aligned_be64 threshold_total_match_bytes;
+
+    uint8_t table_id;
+    uint8_t pad2[3];
+    ovs_be32 out_port;
+    ovs_be32 out_group;
+
+    ovs_32aligned_be64 flow_cookie;
+    ovs_32aligned_be64 cookie_mask;
+
+    /* Followed by an ofp11_match structure. */
+    
 };
 
 
@@ -150,7 +179,7 @@ struct evt_event_single_port_report{
     ovs_32aligned_be64 total_rx_bytes;
 };
 
-struct evt_event_flow_timer_report_header{
+struct evt_event_flow_timer_report_header_ofp10{
     struct ofp10_match match;
     uint8_t table_id;
     uint8_t pad;
@@ -160,7 +189,7 @@ struct evt_event_flow_timer_report_header{
     ovs_be32 interval_msec;
 };
  
-struct evt_event_single_flow_report{
+struct evt_event_single_flow_report_ofp10{
 
     ovs_be16 length;
     uint8_t table_id;
@@ -177,6 +206,37 @@ struct evt_event_single_flow_report{
 
     ovs_32aligned_be64 total_match_packets;
     ovs_32aligned_be64 total_match_bytes;
+};
+
+struct evt_event_flow_timer_report_header_ofp11{
+    uint8_t table_id;
+    uint8_t pad[3];
+    ovs_be32 out_port;
+    ovs_be32 out_group;
+
+    ovs_be32 interval_sec;
+    ovs_be32 interval_msec;
+
+    uint8_t pad2[4];
+
+    /* Followed by ofp11_match. */
+
+};
+
+struct evt_event_single_flow_report_ofp11{
+    ovs_be16 length;
+    uint8_t table_id;
+    uint8_t pad;
+    ovs_32aligned_be64 flow_cookie;
+    ovs_be32 duration_sec;
+    ovs_be32 duration_nsec;
+
+    ovs_32aligned_be64 new_match_packets;
+    ovs_32aligned_be64 new_match_bytes;
+    ovs_32aligned_be64 total_match_packets;
+    ovs_32aligned_be64 total_match_bytes;
+    /*Followed by ofp11_match.*/
+    /*Followed by instructions.*/
 };
 
 #endif
