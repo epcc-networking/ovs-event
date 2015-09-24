@@ -284,6 +284,10 @@ enum ofp_raw_action_type {
 
     /* NX1.0+(34): struct nx_action_conjunction. */
     NXAST_RAW_CONJUNCTION,
+
+/* EPCC actions. */
+    /* EPCC1.0+(9): struct epcc_action_test. */
+    EPCCAST_RAW_TEST,
 };
 
 /* OpenFlow actions are always a multiple of 8 bytes in length. */
@@ -4367,6 +4371,72 @@ format_SAMPLE(const struct ofpact_sample *a, struct ds *s)
                   a->obs_domain_id, a->obs_point_id);
 }
 
+/* EPCC test actions. */
+struct epcc_action_test{
+    ovs_be16 type; /* OFPAT_VENDOR. */
+    ovs_be16 len;  /* length is 16. */
+    ovs_be32 vendor; /* EPCC_VENDOR_ID. */
+    ovs_be16 subtype; /* EPCCAST_TEST. */
+    uint8_t pad[2]; /* padding. */
+    ovs_be32 magic_number;
+};
+
+static enum ofperr
+decode_EPCCAST_RAW_TEST(const struct epcc_action_test *test_, struct ofpbuf *out)
+{
+
+    struct ofpact_epcc_test *test;
+    VLOG_INFO("Decode Test:");
+    test = ofpact_put_EPCC_TEST(out);
+    test->magic_number = ntohl(test_->magic_number);
+
+    VLOG_INFO("Decode:Test: magic number = %"PRIu32" ",test->magic_number);
+
+    return 0;
+}
+
+static void 
+encode_EPCC_TEST(const struct ofpact_epcc_test *test,
+            enum ofp_version ofp_version OVS_UNUSED,struct ofpbuf *out)
+{
+    struct epcc_action_test *test_;
+    test_ = put_EPCCAST_TEST(out);
+    test_->magic_number = htonl(test->magic_number);
+    VLOG_INFO("Encode:Test: magic number = %"PRIu32" ",test_->magic_number);
+}
+
+static char* OVS_WARN_UNUSED_RESULT
+parse_EPCC_TEST(char *arg, struct ofpbuf *ofpacts,
+                enum ofputil_protocol *usable_protocols OVS_UNUSED)
+{
+
+    struct ofpact_epcc_test *oet = ofpact_put_EPCC_TEST(ofpacts);
+    char *key, *value;
+
+    while( ofputil_parse_key_value(&arg,&key,&value) ){
+        char *error;
+        if( ! strcmp(key,"magic-number") ){
+            str_to_u32(value,&oet->magic_number);
+        } 
+        else{
+            error = xasprintf("Invalid key %s",key);
+        }
+
+        if(error){
+            return error;
+        }
+    }
+
+    return NULL;
+}
+
+static void format_EPCC_TEST(const struct ofpact_epcc_test *test,struct ds *s){
+
+    VLOG_INFO("Format");
+    VLOG_INFO("Magic number=%"PRIu32" ",test->magic_number);
+    ds_put_format(s,"epcc-test(magic-number=%"PRIu32" )",test->magic_number);
+}
+
 /* Meter instruction. */
 
 static void
@@ -4630,7 +4700,7 @@ ofpacts_decode(const void *actions, size_t actions_len,
         enum ofp_raw_action_type raw;
         enum ofperr error;
         uint64_t arg;
-
+        
         error = ofpact_pull_raw(&openflow, ofp_version, &raw, &arg);
         if (!error) {
             error = ofpact_decode(action, raw, arg, ofpacts);
@@ -4671,7 +4741,7 @@ ofpacts_pull_openflow_actions__(struct ofpbuf *openflow,
                      actions_len, openflow->size);
         return OFPERR_OFPBRC_BAD_LEN;
     }
-
+    
     error = ofpacts_decode(actions, actions_len, version, ofpacts);
     if (error) {
         ofpbuf_clear(ofpacts);
@@ -4773,6 +4843,7 @@ ofpact_is_set_or_move_action(const struct ofpact *a)
     case OFPACT_STRIP_VLAN:
     case OFPACT_WRITE_ACTIONS:
     case OFPACT_WRITE_METADATA:
+    case OFPACT_EPCC_TEST: /*for test --Yi Tao*/
         return false;
     default:
         OVS_NOT_REACHED();
@@ -4811,6 +4882,7 @@ ofpact_is_allowed_in_actions_set(const struct ofpact *a)
     case OFPACT_SET_VLAN_PCP:
     case OFPACT_SET_VLAN_VID:
     case OFPACT_STRIP_VLAN:
+    case OFPACT_EPCC_TEST:
         return true;
 
     /* In general these actions are excluded because they are not part of
@@ -5046,6 +5118,7 @@ ovs_instruction_type_from_ofpact_type(enum ofpact_type type)
     case OFPACT_EXIT:
     case OFPACT_UNROLL_XLATE:
     case OFPACT_SAMPLE:
+    case OFPACT_EPCC_TEST:
     default:
         return OVSINST_OFPIT11_APPLY_ACTIONS;
     }
@@ -5640,6 +5713,9 @@ ofpact_check__(enum ofputil_protocol *usable_protocols, struct ofpact *a,
          * OpenFlow. */
         return OFPERR_OFPBAC_BAD_TYPE;
 
+    case OFPACT_EPCC_TEST:
+        return 0;
+
     default:
         OVS_NOT_REACHED();
     }
@@ -6040,6 +6116,7 @@ ofpact_outputs_to_port(const struct ofpact *ofpact, ofp_port_t port)
     case OFPACT_GOTO_TABLE:
     case OFPACT_METER:
     case OFPACT_GROUP:
+    case OFPACT_EPCC_TEST:
     default:
         return false;
     }
@@ -6545,7 +6622,7 @@ ofpact_decode_raw(enum ofp_version ofp_version,
     if (oah->type == htons(OFPAT_VENDOR)) {
         /* Get vendor. */
         hdrs.vendor = ntohl(oah->vendor);
-        if (hdrs.vendor == NX_VENDOR_ID || hdrs.vendor == ONF_VENDOR_ID) {
+        if (hdrs.vendor == NX_VENDOR_ID || hdrs.vendor == ONF_VENDOR_ID || hdrs.vendor == EPCC_VENDOR_ID) {
             /* Get extension subtype. */
             const struct ext_action_header *nah;
 
@@ -6557,6 +6634,7 @@ ofpact_decode_raw(enum ofp_version ofp_version,
         } else {
             VLOG_WARN_RL(&rl, "OpenFlow action has unknown vendor %#"PRIx32,
                          hdrs.vendor);
+            VLOG_INFO("Bad vendor"); /* * */
             return OFPERR_OFPBAC_BAD_VENDOR;
         }
     } else {
@@ -6669,7 +6747,8 @@ ofpact_put_raw(struct ofpbuf *buf, enum ofp_version ofp_version,
         break;
 
     case NX_VENDOR_ID:
-    case ONF_VENDOR_ID: {
+    case ONF_VENDOR_ID:
+    case EPCC_VENDOR_ID: { /* Added for epcc extesions */
         struct ext_action_header *nah = (struct ext_action_header *) oah;
         nah->subtype = htons(hdrs->type);
         break;

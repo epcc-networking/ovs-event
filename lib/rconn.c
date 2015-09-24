@@ -556,8 +556,8 @@ run_ACTIVE(struct rconn *rc)
         unsigned int base = MAX(rc->last_activity, rc->state_entered);
         int version;
 
-        VLOG_DBG("%s: idle %u seconds, sending inactivity probe",
-                 rc->name, (unsigned int) (time_now() - base));
+        VLOG_DBG("%s: idle %u seconds, sending inactivity probe, now is %u, last acivity is %u",
+                 rc->name, (unsigned int) (time_now() - base), time_now(), base);
 
         version = rconn_get_version__(rc);
         ovs_assert(version >= 0 && version <= 0xff);

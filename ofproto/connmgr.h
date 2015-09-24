@@ -28,7 +28,7 @@
 #include "openflow/nicira-ext.h"
 #include "openvswitch/types.h"
 
-//#include "openflow/event-ext.h"
+//#include "openflow/epcc-ext.h"
 
 struct nlattr;
 struct ofconn;
@@ -61,6 +61,7 @@ enum ofconn_async_msg_type {
     OAM_PACKET_IN,              /* OFPT_PACKET_IN or NXT_PACKET_IN. */
     OAM_PORT_STATUS,            /* OFPT_PORT_STATUS. */
     OAM_FLOW_REMOVED,           /* OFPT_FLOW_REMOVED or NXT_FLOW_REMOVED. */
+    OAM_VENDOR,                 /* Vendor defined async messages. */
     OAM_N_TYPES
 };
 
@@ -139,6 +140,10 @@ void ofconn_set_controller_id(struct ofconn *, uint16_t controller_id);
 
 void ofconn_set_invalid_ttl_to_controller(struct ofconn *, bool);
 bool ofconn_get_invalid_ttl_to_controller(struct ofconn *);
+
+/*vendor related async messges.*/
+void ofconn_set_send_vendor_async_msg(struct ofconn *, bool);
+bool ofconn_get_send_vendor_async_msg(struct ofconn *);
 
 int ofconn_get_miss_send_len(const struct ofconn *);
 void ofconn_set_miss_send_len(struct ofconn *, int miss_send_len);

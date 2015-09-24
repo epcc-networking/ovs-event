@@ -1,7 +1,7 @@
 #ifndef _EVENT_STRUCT_H
 #define _EVENT_STRUCT_H
 
-#include "openflow/event-ext.h"
+#include "openflow/epcc-ext.h"
 #include "match.h"
 #include "list.h"
 #include "ofproto-provider.h"

@@ -32,7 +32,7 @@
 #include "openvswitch/types.h"
 #include "type-props.h"
 
-#include "openflow/event-ext.h" /* Event related extentions. */
+#include "openflow/epcc-ext.h" /* Event related extentions. */
 
 struct ofpbuf;
 union ofp_action;

@@ -8945,7 +8945,7 @@ ofputil_decode_event_request_port_timer(const struct ofp_header *oh,
     raw = ofpraw_pull_assert(&b);
 
     request =  ofpbuf_pull(&b, sizeof *request);
-    VLOG_INFO("size = %u",sizeof *request);
+
     event_req -> event_id = ntohl(request -> event_id);
     event_req -> request_type = request -> request_type; 
     event_req -> periodic = request -> periodic;
@@ -8963,11 +8963,7 @@ ofputil_decode_event_request_port_timer(const struct ofp_header *oh,
         = ntohll(get_32aligned_be64(&request->threshold_rx_packets) );
     event_req -> threshold_rx_bytes
         = ntohll(get_32aligned_be64(&request->threshold_rx_bytes) );
-    VLOG_INFO("Check port %u, interval = %us+%ums"
-        ,event_req->check_port,event_req->interval_sec,event_req->interval_msec);
-    VLOG_INFO("Threshold: TX packets=%"PRIu64", TX bytes= %"PRIu64", RX packets=%"PRIu64", RX bytes=%"PRIu64" "
-        ,event_req -> threshold_tx_packets, event_req -> threshold_tx_bytes
-        ,event_req -> threshold_rx_packets, event_req -> threshold_rx_bytes);
+
     return 0;
 }
 
@@ -8986,7 +8982,7 @@ ofputil_decode_ofp10_event_request_flow_timer(const struct ofp_header *oh,
     raw = ofpraw_pull_assert(&b);
 
     request = ofpbuf_pull(&b, sizeof *request);
-    VLOG_INFO_ONCE("req size = %u",sizeof *request);
+
     event_req -> event_id = ntohl(request -> event_id);
     event_req -> request_type = request -> request_type; 
     event_req -> periodic = request -> periodic;
@@ -8996,11 +8992,9 @@ ofputil_decode_ofp10_event_request_flow_timer(const struct ofp_header *oh,
     event_req->out_group = OFPG_ANY;
     event_req->out_port = u16_to_ofp( ntohs ( request-> out_port) );
 
-    
-    VLOG_INFO_ONCE("offset of match = %ld", (void *)&(request->match) - (void *)request);
     event_req -> table_id = request->table_id;
     event_req -> out_port = u16_to_ofp( ntohs ( request-> out_port) );
-    VLOG_INFO_ONCE("offset of cookie = %ld", (void *)&(request->flow_cookie) - (void *)request);
+
     event_req -> flow_cookie = get_32aligned_be64(&request->flow_cookie);
     event_req -> cookie_mask = get_32aligned_be64(&request->cookie_mask);
 
@@ -9030,8 +9024,6 @@ ofputil_decode_ofp11_event_request_flow_timer(const struct ofp_header *oh,
     uint16_t length = ntohs(oh->length);
     enum ofpraw raw;
 
-    VLOG_INFO("length = %d\n",length);
-
     ofpbuf_use_const(&b,oh,length);
     raw = ofpraw_pull_assert(&b);
 
@@ -9041,8 +9033,6 @@ ofputil_decode_ofp11_event_request_flow_timer(const struct ofp_header *oh,
     event_req -> periodic = request -> periodic;
     event_req -> event_type = ntohs(request->event_type);
 
-    VLOG_INFO("request type = %d, periodic = %d, event_type = %d, event_id = %d",
-        event_req -> request_type,event_req->periodic,event_req->event_type,event_req->event_id);
 
     event_req -> table_id = request->table_id;
     ofputil_port_from_ofp11(request->out_port,&event_req->out_port);
@@ -9055,8 +9045,7 @@ ofputil_decode_ofp11_event_request_flow_timer(const struct ofp_header *oh,
 
     event_req -> interval_sec = ntohl(request->interval_sec);
     event_req -> interval_msec = ntohl(request->interval_msec);
-    VLOG_INFO("interval = %"PRIu32" seconds + %"PRIu32" milliseconds ",
-        event_req->interval_sec,event_req->interval_msec);
+
     event_req -> threshold_match_packets 
         = ntohll( get_32aligned_be64(&request->threshold_match_packets) );
     event_req -> threshold_match_bytes   
@@ -9066,16 +9055,8 @@ ofputil_decode_ofp11_event_request_flow_timer(const struct ofp_header *oh,
     event_req -> threshold_total_match_bytes   
         = ntohll( get_32aligned_be64(&request->threshold_total_match_bytes) );
 
-    VLOG_INFO("event conditon = %u", event_req->event_conditions);
-    VLOG_INFO("Thresholds: new match packets %"PRIu64", new match bytes %"PRIu64", total match packets %"PRIu64", total match bytes %"PRIu64" ",
-        event_req -> threshold_match_packets, event_req -> threshold_match_bytes, 
-        event_req -> threshold_total_match_packets, event_req -> threshold_total_match_bytes);
 
-    VLOG_INFO("output port = %d, output group = %u, flow cookie = %"PRIu64", cookie mask = %"PRIu64" ",
-        event_req->out_port, event_req->out_group, event_req->flow_cookie,event_req->cookie_mask);
     ofputil_pull_ofp11_match(&b, &event_req->match, NULL);
-    VLOG_INFO("match = %s",match_to_string(&event_req->match, OFP_DEFAULT_PRIORITY) );
-
 
     return 0; 
 
@@ -9087,11 +9068,11 @@ ofputil_decode_event_request_flow_timer(const struct ofp_header *oh,
                                       struct ofputil_event_request_flow_timer *event_req )
 {
     if (oh -> version == OFP10_VERSION){
-        VLOG_INFO("decode event request on flow stats on openflow 1.0");
+        /* VLOG_INFO("decode event request on flow stats on openflow 1.0");*/
         return ofputil_decode_ofp10_event_request_flow_timer(oh,event_req);
     }
     else if(oh -> version >= OFP11_VERSION){
-        VLOG_INFO("decode event request on flow stats on openflow 1.1+");
+        /* VLOG_INFO("decode event request on flow stats on openflow 1.1+");*/
         return ofputil_decode_ofp11_event_request_flow_timer(oh,event_req);
     }
     else{
@@ -9190,11 +9171,6 @@ ofputil_encode_ofp10_event_flow_timer_report(enum ofp_version version,
         sfr->duration_sec = htonl(single_flow->duration_sec);
         sfr->duration_nsec = htonl(single_flow->duration_nsec);
 
-        /*sfr->new_match_packets = htonll(single_flow->new_match_packets);
-        sfr->new_match_bytes = htonll(single_flow->new_match_bytes);
-        sfr->total_match_packets = htonll(single_flow->total_match_packets);
-        sfr->total_match_bytes = htonll(single_flow->total_match_bytes);*/
-
         put_32aligned_be64(&sfr->new_match_packets
             ,htonll(single_flow->new_match_packets) );
         put_32aligned_be64(&sfr->new_match_bytes, htonll(single_flow->new_match_bytes) );
@@ -9218,7 +9194,6 @@ ofputil_encode_ofp11_event_flow_timer_report( enum ofp_version version,
     struct ofpbuf *b = ofputil_encode_event_report_header(version,rh);
 
     struct evt_event_flow_timer_report_header_ofp11 *efrh;
-    struct evt_event_single_flow_report_ofp11 *sfr;
     struct ofputil_event_single_flow_report *single_flow;
     int match_len = 0;
     enum ofputil_protocol oxm_protocol = ofputil_protocol_from_ofp_version(version);
@@ -9238,8 +9213,10 @@ ofputil_encode_ofp11_event_flow_timer_report( enum ofp_version version,
         int match_len,inst_len;
         size_t size_before;
         size_before = b->size;
-        VLOG_INFO("encoding on single flow..");
-        sfr = ofpbuf_put_zeros(b,sizeof *sfr); 
+        /*VLOG_INFO("Offset = %u",size_before);*/
+        ovs_be16 *ptr;
+        struct evt_event_single_flow_report_ofp11 *sfr;
+        sfr = ofpbuf_put_zeros(b,sizeof *sfr) ; 
         sfr->table_id = single_flow->table_id;
         put_32aligned_be64(&sfr->flow_cookie,single_flow->flow_cookie);
         
@@ -9257,11 +9234,14 @@ ofputil_encode_ofp11_event_flow_timer_report( enum ofp_version version,
         }
 
         ofpacts_put_openflow_instructions(single_flow->ofpacts,single_flow->ofpacts_len,b,version);
-
+        sfr = (struct evt_event_single_flow_report_ofp11 *)(ofpbuf_at(b,size_before,sizeof *sfr) );
         sfr->length = htons(b->size - size_before);
-        VLOG_INFO("length = %u\n", ntohs(sfr->length) );
-    }
 
+        ptr = (ovs_be16 *)ofpbuf_at(b,size_before,2);
+        /*VLOG_INFO("Length = %u",ntohs(sfr->length) );*/
+    }
+    /*VLOG_INFO("Total length = %u",b->size);*/
+    /*VLOG_INFO("XID = %u, length = %u ", ntohl( ((struct ofp_header *)b->header)->xid ), ((struct ofp_header *)b->header)->length);*/
     return b;
 
 }

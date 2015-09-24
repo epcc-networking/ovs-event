@@ -61,7 +61,7 @@
 #include "openvswitch/vlog.h"
 #include "bundles.h"
 
-#include "openflow/event-ext.h"
+#include "openflow/epcc-ext.h"
 #include "event-struct.h"
 
 VLOG_DEFINE_THIS_MODULE(ofproto);
@@ -1494,7 +1494,7 @@ ofproto_destroy__(struct ofproto *ofproto)
     OVS_EXCLUDED(ofproto_mutex)
 {
     struct oftable *table;
-
+    /*VLOG_INFO("start of ofproto_destroy__, destroy ofproto %s",ofproto->name);*/
     destroy_rule_executes(ofproto);
     delete_group(ofproto, OFPG_ALL);
 
@@ -1529,6 +1529,7 @@ ofproto_destroy__(struct ofproto *ofproto)
     free(ofproto->vlan_bitmap);
 
     ofproto->ofproto_class->dealloc(ofproto);
+    /*VLOG_INFO("end of ofproto_destroy__");*/
 }
 
 void
@@ -1543,6 +1544,8 @@ ofproto_destroy(struct ofproto *p)
     if (!p) {
         return;
     }
+    /**/
+    /*VLOG_INFO("start to destroy ofproto %s",p->name);*/
 
     if (p->meters) {
         meter_delete(p, 1, p->meter_features.max_meters);
@@ -1552,6 +1555,7 @@ ofproto_destroy(struct ofproto *p)
     }
 
     /* delete events. */
+
     LIST_FOR_EACH_SAFE(event,next_event,event_list_node,&p->event_list){
         ofproto_event_delete(p,event);
     }
@@ -1577,6 +1581,8 @@ ofproto_destroy(struct ofproto *p)
 
     /* Destroying rules is deferred, must have 'ofproto' around for them. */
     ovsrcu_postpone(ofproto_destroy__, p);
+
+    /*VLOG_INFO("finish destroy ofproto %s",p->name);*/
 }
 
 /* Destroys the datapath with the respective 'name' and 'type'.  With the Linux
@@ -2089,6 +2095,7 @@ ofproto_flow_mod(struct ofproto *ofproto, struct ofputil_flow_mod *fm)
     /* Optimize for the most common case of a repeated learn action.
      * If an identical flow already exists we only need to update its
      * 'modified' time. */
+
     if (fm->command == OFPFC_MODIFY_STRICT && fm->table_id != OFPTT_ALL
         && !(fm->flags & OFPUTIL_FF_RESET_COUNTS)) {
         struct oftable *table = &ofproto->tables[fm->table_id];
@@ -3903,6 +3910,15 @@ handle_flow_stats_request(struct ofconn *ofconn,
     enum ofperr error;
     size_t i;
 
+    /*Added by Yi Tao, for test.*/
+    /*
+    struct timeval start;
+    struct timeval end;
+    uint16_t rand_num = 0;
+
+    xgettimeofday(&start);
+    */
+
     error = ofputil_decode_flow_stats_request(&fsr, request);
     if (error) {
         return error;
@@ -3963,6 +3979,16 @@ handle_flow_stats_request(struct ofconn *ofconn,
     rule_collection_destroy(&rules);
 
     ofconn_send_replies(ofconn, &replies);
+
+    /*Added by Yi Tao,for test*/
+    /*
+    srand(time_msec());
+    rand_num = random_uint16();
+    if(rand_num < 6666){
+        xgettimeofday(&end);
+        VLOG_INFO("handle flow stats request cost %lld usec", 1000000LL * (end.tv_sec - start.tv_sec) + end.tv_usec - start.tv_usec);
+    }
+    */
 
     return 0;
 }
@@ -4479,6 +4505,7 @@ add_flow(struct ofproto *ofproto, struct ofputil_flow_mod *fm,
 
     ofmonitor_report(ofproto->connmgr, rule, NXFME_ADDED, 0,
                      req ? req->ofconn : NULL, req ? req->xid : 0, NULL);
+
 
     return req ? send_buffered_packet(req->ofconn, fm->buffer_id, rule) : 0;
 }
@@ -6190,6 +6217,9 @@ delete_group__(struct ofproto *ofproto, struct ofgroup *ofgroup)
     struct match match;
     struct ofputil_flow_mod fm;
 
+    /*LOG start.*/
+    uint32_t group_id = ofgroup->group_id;
+    /*VLOG_INFO("delete_group__ of group %08x",ofgroup->group_id);*/
     /* Delete all flow entries containing this group in a group action */
     match_init_catchall(&match);
     flow_mod_init(&fm, &match, 0, NULL, 0, OFPFC_DELETE);
@@ -6202,6 +6232,7 @@ delete_group__(struct ofproto *ofproto, struct ofgroup *ofgroup)
     ofproto->n_groups[ofgroup->type]--;
     ovs_rwlock_unlock(&ofproto->groups_rwlock);
     ofproto_group_unref(ofgroup);
+    /*VLOG_INFO("delete_group__ of group %08x done",group_id);*/
 }
 
 /* Implements OFPGC11_DELETE. */
@@ -6540,7 +6571,7 @@ handle_event_add(struct ofconn *ofconn, const struct ofp_header *oh,
     enum ofperr error;
     struct ofputil_event_reply_msg reply;
     struct ofpbuf *reply_buf;
-    VLOG_INFO("Add event");
+
 
     ofproto = ofconn_get_ofproto(ofconn);
     event = xmalloc( sizeof *event);
@@ -6744,8 +6775,8 @@ handle_event_request(struct ofconn *ofconn, const struct ofp_header *oh )
 }
 
 
-void event_wait
-( const struct ofproto* ofproto )
+void 
+event_wait ( const struct ofproto* ofproto )
 {
     uint16_t event_id = 1;
     struct event* event;
@@ -6776,7 +6807,7 @@ event_port_timer_check( struct ofproto* ofproto, struct event_port_timer* port_t
 
         if( port_stats.tx_packets != ULLONG_MAX && 
             port_stats.tx_packets >=
-            port_timer -> prev_tx_packets + port_timer -> threshold_tx_packets){
+            port_timer -> prev_tx_packets + port_timer->threshold_tx_packets){
 
             /*VLOG_INFO("Triggered by TX packets, %"PRIu64" packets "
                 , port_stats.tx_packets - port_timer->prev_tx_packets);*/
@@ -6809,10 +6840,10 @@ event_port_timer_check( struct ofproto* ofproto, struct event_port_timer* port_t
     if( (port_timer -> event_conditions & EVT_CONDITION_RX_BYTES) != 0 ){
         if( port_stats.rx_bytes != ULLONG_MAX && 
             port_stats.rx_bytes >= 
-            port_timer->prev_rx_bytes + port_timer ->prev_rx_bytes){
+            port_timer->prev_rx_bytes + port_timer->threshold_rx_bytes){
 
-            /*VLOG_INFO("Triggered by RX bytes, %"PRIu64" bytes "
-                , port_stats.rx_bytes - port_timer->prev_rx_bytes);*/
+            /*VLOG_INFO("Triggered by RX bytes, %"PRIu64" bytes , threshold = %"PRIu64" "
+                , port_stats.rx_bytes - port_timer->prev_rx_bytes, port_timer->threshold_rx_bytes);*/
             happened = true;
         }
     }
@@ -7016,8 +7047,8 @@ event_flow_timer_check(struct ofproto *ofproto, struct event_flow_timer *flow_ti
         }
     }
 
-    VLOG_INFO("%u flows checked, %u flows triggered, %u flows added, %u flows removed",
-        flows_checked,flows_triggered,flows_added,flows_removed);
+    /* VLOG_INFO("%u flows checked, %u flows triggered, %u flows added, %u flows removed",
+        flows_checked,flows_triggered,flows_added,flows_removed); */
 
     if(happened){
         return report;
@@ -7033,9 +7064,9 @@ void
 ofproto_event_run(struct ofproto *ofproto){
     struct event* event;
     
-    /*struct timeval start;
+    struct timeval start;
     struct timeval end;
-    xgettimeofday(&start);*/
+    xgettimeofday(&start);
     bool real_run = false;
 
     LIST_FOR_EACH(event,event_list_node, &(ofproto->event_list)){
@@ -7061,7 +7092,7 @@ ofproto_event_run(struct ofproto *ofproto){
                     report_header.report_body.port_report = report;
 
                     /*buf = ofputil_encode_event_port_timer_report(OFP10_VERSION,&report_header, report);*/
-                    VLOG_INFO("Event %u on port happened at %lld. send to controller.", event->event_id, time_msec());
+                    /*VLOG_INFO("Event %u on port happened at %lld. send to controller.", event->event_id, time_msec());*/
                     connmgr_send_event_report(ofproto->connmgr,&report_header);
 
                     /*VLOG_INFO("Event %u: port stats happened", event->event_id);
@@ -7107,8 +7138,7 @@ ofproto_event_run(struct ofproto *ofproto){
                     report_header.event_id = event->event_id;
                     report_header.report_body.flow_report = report;
 
-                    //buf = ofputil_encode_event_flow_timer_report(OFP10_VERSION,&report_header, report);
-                    VLOG_INFO("Event %u on flows happened at %lld. send to controller.", event->event_id, time_msec());
+                    /*VLOG_INFO("Event %u on flows happened at %u on %s. send to controller.", event->event_id, time_now(), ofproto->name );*/
                     connmgr_send_event_report( ofproto->connmgr, &report_header);
 
                     //VLOG_INFO("match = %s", match_to_string(&flow_timer->match,0) );
@@ -7124,8 +7154,7 @@ ofproto_event_run(struct ofproto *ofproto){
                         free(flow_report);
                     }
 
-                    //VLOG_INFO("Reported flow event : %s", ofpbuf_to_string(buf,4096) );
-                    //free(buf);
+                    /*VLOG_INFO("Reported flow event : %s", ofpbuf_to_string(buf,4096) );*/
 
                     free(report);
                 }
@@ -7141,9 +7170,17 @@ ofproto_event_run(struct ofproto *ofproto){
         }
     }
 
-    /*xgettimeofday(&end);*/
-    /*f(real_run)
-        VLOG_INFO("Event-run, cost %lld usecs", 1000000LL * (end.tv_sec - start.tv_sec) + end.tv_usec - start.tv_usec);*/
+    xgettimeofday(&end);
+    /*
+    if(real_run){
+        uint16_t rand_num;
+        srand(time_msec());
+        rand_num = random_uint16();
+        if(rand_num < 6666){
+            VLOG_INFO("Event-run, cost %lld usecs", 1000000LL * (end.tv_sec - start.tv_sec) + end.tv_usec - start.tv_usec);
+        }
+    }
+    */
 }
 
 

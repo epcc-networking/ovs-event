@@ -964,6 +964,24 @@ ofconn_get_invalid_ttl_to_controller(struct ofconn *ofconn)
     return (ofconn->master_async_config[OAM_PACKET_IN] & bit) != 0;
 }
 
+void
+ofconn_set_send_vendor_async_msg(struct ofconn *ofconn, bool enable)
+{
+    uint32_t bit = 1u; 
+    if (enable){
+        ofconn->master_async_config[OAM_VENDOR] |= bit;
+    } else {
+        ofconn->master_async_config[OAM_VENDOR] &= ~bit;
+    }
+}
+
+bool 
+ofconn_get_send_vendor_async_msg(struct ofconn *ofconn)
+{
+    uint32_t bit = 1u;
+    return (ofconn->master_async_config[OAM_VENDOR] & bit ) != 0;
+}
+
 /* Returns the currently configured protocol for 'ofconn', one of OFPUTIL_P_*.
  *
  * Returns OFPUTIL_P_NONE, which is not a valid protocol, if 'ofconn' hasn't
@@ -1264,12 +1282,15 @@ ofconn_flush(struct ofconn *ofconn)
                                     | (1u << OFPRR_HARD_TIMEOUT)
                                     | (1u << OFPRR_DELETE));
 
+        master[OAM_VENDOR] = 1u;
+
         /* "slave" role gets port status updates by default. */
         slave[OAM_PACKET_IN] = 0;
         slave[OAM_PORT_STATUS] = ((1u << OFPPR_ADD)
                                   | (1u << OFPPR_DELETE)
                                   | (1u << OFPPR_MODIFY));
         slave[OAM_FLOW_REMOVED] = 0;
+        slave[OAM_VENDOR] = 0;
     } else {
         memset(ofconn->master_async_config, 0,
                sizeof ofconn->master_async_config);
@@ -1671,22 +1692,25 @@ connmgr_send_event_report(struct connmgr *mgr,
  const struct ofputil_event_report_header *erh)
 {
     struct ofconn *ofconn;
-    VLOG_INFO("Report sent to controller at %lld ", time_msec() );
+    /*VLOG_INFO("Report sent to controller at %lld ", time_msec() );*/
     LIST_FOR_EACH(ofconn, node, &mgr->all_conns){
-        struct ofpbuf *msg;
-        if(erh->event_type == EVT_PORT_STATS_TIMER_TRIGGER){
-            msg = ofputil_encode_event_port_timer_report( 
-                rconn_get_version(ofconn->rconn), erh, erh->report_body.port_report );
-            ofconn_send(ofconn,msg,NULL);
-        }
-        else if(erh->event_type == EVT_FLOW_STATS_TIMER_TRIGGER){
-            msg = ofputil_encode_event_flow_timer_report(
-                rconn_get_version(ofconn->rconn), erh, erh->report_body.flow_report );
-            ofconn_send(ofconn,msg,NULL);
-        }
-        else{
+        if(ofconn_receives_async_msg(ofconn,OAM_VENDOR,0) ){
+            struct ofpbuf *msg;
+            if(erh->event_type == EVT_PORT_STATS_TIMER_TRIGGER){
+                msg = ofputil_encode_event_port_timer_report( 
+                    rconn_get_version(ofconn->rconn), erh, erh->report_body.port_report );
+                ofconn_send(ofconn,msg,NULL);
+            }
+            else if(erh->event_type == EVT_FLOW_STATS_TIMER_TRIGGER){
+                msg = ofputil_encode_event_flow_timer_report(
+                    rconn_get_version(ofconn->rconn), erh, erh->report_body.flow_report );
+                ofconn_send(ofconn,msg,NULL);
+            }
+            else{
 
+            }        
         }
+
     }
 }
 
@@ -2299,6 +2323,7 @@ ofmonitor_flush(struct connmgr *mgr)
             }
         }
     }
+
 }
 
 static void

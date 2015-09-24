@@ -75,6 +75,7 @@ VLOG_DEFINE_THIS_MODULE(ofproto_dpif_xlate);
  * recursive or not. */
 #define MAX_RESUBMITS (MAX_RESUBMIT_RECURSION * MAX_RESUBMIT_RECURSION)
 
+
 struct xbridge {
     struct hmap_node hmap_node;   /* Node in global 'xbridges' map. */
     struct ofproto_dpif *ofproto; /* Key in global 'xbridges' map. */
@@ -1451,7 +1452,6 @@ group_best_live_bucket(const struct xlate_ctx *ctx,
         }
         i++;
     }
-
     return best_bucket;
 }
 
@@ -3214,13 +3214,18 @@ xlate_default_select_group(struct xlate_ctx *ctx, struct group_dpif *group)
     struct flow_wildcards *wc = &ctx->xout->wc;
     struct ofputil_bucket *bucket;
     uint32_t basis;
+    /*static struct vlog_rate_limit rl = VLOG_RATE_LIMIT_INIT(60,200);*/
 
     basis = flow_hash_symmetric_l4(&ctx->xin->flow, 0);
     flow_mask_hash_fields(&ctx->xin->flow, wc, NX_HASH_FIELDS_SYMMETRIC_L4);
     bucket = group_best_live_bucket(ctx, group, basis);
+
     if (bucket) {
         xlate_group_bucket(ctx, bucket);
         xlate_group_stats(ctx, group, bucket);
+    
+        /*VLOG_INFO_RL(&rl,"datapath %"PRIx64" group %"PRIx32" Flow %s, basis=%u Chose bucket %d",
+            ( GROUP_CAST(group) )->ofproto->datapath_id, ( GROUP_CAST(group) )->group_id, flow_to_string(&ctx->xin->flow), basis, bucket->bucket_id);*/
     }
 }
 
@@ -4447,6 +4452,42 @@ do_xlate_actions(const struct ofpact *ofpacts, size_t ofpacts_len,
 
         case OFPACT_SAMPLE:
             xlate_sample_action(ctx, ofpact_get_SAMPLE(a));
+            break;
+
+        case OFPACT_EPCC_TEST: {
+                //struct ofproto *ofproto = ctx->xbridge->ofproto->up;
+                struct ofputil_flow_mod fm;
+                struct match match;
+                struct flow_wildcards wildcards;
+                struct ofproto_dpif * ofproto = ctx->xbridge->ofproto;
+
+                VLOG_INFO("Test: magic number = %"PRIu32" on switch %s", 
+                    ofpact_get_EPCC_TEST(a)->magic_number, ctx->xbridge->name );
+
+                
+                flow_wildcards_init_for_packet(&wildcards,flow);
+                match_init(&match,flow,&wildcards);
+                match_init_hidden_fields(&match);
+
+                fm.match = match;
+                fm.table_id = ctx->table_id;
+                fm.priority = UINT16_MAX;
+                fm.command = OFPFC_ADD;
+                fm.buffer_id = UINT32_MAX;
+                fm.idle_timeout = 10;
+                fm.hard_timeout = 0;
+                fm.out_group = OFPG11_ANY;
+                fm.out_port = OFPP_NONE;
+                fm.ofpacts = NULL;
+                fm.ofpacts_len = 0;
+                fm.flags = OFPUTIL_FF_SEND_FLOW_REM;
+                fm.new_cookie = ofpact_get_EPCC_TEST(a)->magic_number;
+                /*ofproto_dpif_flow_mod(ofproto,&fm);*/
+
+                VLOG_INFO("Flow %s, in table %"PRIu8" ", flow_to_string(flow),ctx->table_id);
+
+            }
+
             break;
         }
 

@@ -26,7 +26,7 @@
 #include "ovs-thread.h"
 #include "openvswitch/vlog.h"
 
-#include "openflow/event-ext.h"
+#include "openflow/epcc-ext.h"
 
 VLOG_DEFINE_THIS_MODULE(ofp_msgs);
 
@@ -1023,6 +1023,9 @@ raw_info_get(enum ofpraw raw)
 static struct raw_instance *
 raw_instance_get(const struct raw_info *info, uint8_t version)
 {
+    if (version < info->min_version || version > info->max_version){
+        VLOG_INFO("incorrect version: MIN = %u, MAX = %u, verison = %u",info->min_version,info->max_version,version);
+    }
     ovs_assert(version >= info->min_version && version <= info->max_version);
     return &info->instances[version - info->min_version];
 }

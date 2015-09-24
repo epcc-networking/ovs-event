@@ -106,6 +106,7 @@
     OFPACT(EXIT,            ofpact_null,        ofpact, "exit")         \
     OFPACT(SAMPLE,          ofpact_sample,      ofpact, "sample")       \
     OFPACT(UNROLL_XLATE,    ofpact_unroll_xlate, ofpact, "unroll_xlate") \
+    OFPACT(EPCC_TEST,       ofpact_epcc_test,   ofpact,  "epcc_test")   \
                                                                         \
     /* Instructions. */                                                 \
     OFPACT(METER,           ofpact_meter,       ofpact, "meter")        \
@@ -725,6 +726,15 @@ struct ofpact_unroll_xlate {
     /* Metadata in xlate context, visible to controller via PACKET_INs. */
     uint8_t  rule_table_id;       /* 0xFF if none. */
     ovs_be64 rule_cookie;         /* OVS_BE64_MAX if none. */
+};
+
+/* OFPACT_EPCC_TEST
+ *
+ * Used for EPCC_TEST. */
+struct ofpact_epcc_test{
+    struct ofpact ofpact;
+
+    uint32_t magic_number;
 };
 
 /* Converting OpenFlow to ofpacts. */
